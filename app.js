@@ -4,7 +4,7 @@
   var G = window.GYM;
   var KEY = 'gymlog.v1';
   var UNLOCK_KEY = 'gymlog.unlock';
-  var UNLOCK_MS = 12 * 60 * 60 * 1000; // stay unlocked for 12 hours on this device
+  var UNLOCK_MS = 30 * 60 * 1000; // auto-lock after 30 minutes of inactivity or leaving the app
   var STEP_GOAL = 10000;
   var JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
   var PIN_HASH = 'c87a024f10155ed22b50516e977c904257600e04e3cc3bbf77fa426983346bc2';
@@ -762,6 +762,7 @@
     timer.id = setInterval(tick, 250);
   }
   function tick() {
+    recordActivity();
     var left = Math.max(0, Math.ceil((timer.end - Date.now()) / 1000));
     $('#resttime').textContent = Math.floor(left / 60) + ':' + pad(left % 60);
     if (left <= 0) stopRest(true);
@@ -937,6 +938,11 @@
 
   /* ---------- PIN lock ---------- */
   var entry = '';
+  function recordActivity() {
+    if (!$('#root').hidden) {
+      try { localStorage.setItem(UNLOCK_KEY, String(Date.now())); } catch (e) { /* ignore */ }
+    }
+  }
   function isUnlocked() {
     try { var t = +localStorage.getItem(UNLOCK_KEY); return t > 0 && Date.now() - t < UNLOCK_MS; } catch (e) { return false; }
   }
@@ -946,6 +952,7 @@
   }
   function showApp() {
     $('#lock').hidden = true; $('#root').hidden = false;
+    recordActivity();
     selDate = todayKey(); reportWs = weekStartOf(selDate);
     requestPersistentStorage();
     checkAutoRestore(function (restored) {
@@ -996,11 +1003,23 @@
     else if (ev.key === 'Backspace') { entry = entry.slice(0, -1); drawDots(); }
   });
 
+  // Track user activity to refresh auto-lock timer while actively using the app
+  ['pointerdown', 'touchstart', 'click', 'keydown', 'scroll', 'input'].forEach(function (evt) {
+    window.addEventListener(evt, recordActivity, { passive: true });
+  });
+
   // Request persistent storage and check auto-restore on startup
   requestPersistentStorage();
   checkAutoRestore(function (restored) {
     if (restored && !$('#root').hidden) render();
   });
+
+  // Auto-lock checker: locks if idle for 2 minutes while app is displayed
+  setInterval(function () {
+    if (!$('#root').hidden && !isUnlocked()) {
+      showLock();
+    }
+  }, 5000);
 
   // A new day starts a fresh list: re-render when the date changes while the app stays open.
   var lastDay = todayKey();
