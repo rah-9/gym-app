@@ -5,7 +5,7 @@
   var KEY = 'gymlog.v1';
   var UNLOCK_KEY = 'gymlog.unlock';
   var UNLOCK_MS = 12 * 60 * 60 * 1000; // stay unlocked for 12 hours on this device
-  var STEP_GOAL = 8000;
+  var STEP_GOAL = 10000;
   var JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
   var PIN_HASH = 'c87a024f10155ed22b50516e977c904257600e04e3cc3bbf77fa426983346bc2';
 
