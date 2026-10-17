@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Rahul's Gym Log</title>
+  <meta name="description" content="Daily gym checklist, rest timer and weekly report.">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Gym Log">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="lock" class="lock" hidden>
+    <div class="lock-inner">
+      <div class="brand big">Gym <span>log</span></div>
+      <p class="lock-sub">Enter your PIN</p>
+      <div id="pindots" class="pindots" aria-live="polite"><i></i><i></i><i></i><i></i></div>
+      <p id="pinmsg" class="pinmsg" role="alert"></p>
+      <div id="pinpad" class="pinpad">
+        <button type="button" data-n="1">1</button><button type="button" data-n="2">2</button><button type="button" data-n="3">3</button>
+        <button type="button" data-n="4">4</button><button type="button" data-n="5">5</button><button type="button" data-n="6">6</button>
+        <button type="button" data-n="7">7</button><button type="button" data-n="8">8</button><button type="button" data-n="9">9</button>
+        <span></span><button type="button" data-n="0">0</button><button type="button" data-k="del" aria-label="Delete">&#9003;</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="root" hidden>
+    <header class="top">
+      <div class="brand">Gym <span>log</span></div>
+      <button type="button" class="iconbtn" data-action="lock" aria-label="Lock">Lock</button>
+    </header>
+    <main id="view" class="view"></main>
+    <nav class="tabs" aria-label="Sections">
+      <button type="button" data-view="today">Today</button>
+      <button type="button" data-view="report">Report</button>
+      <button type="button" data-view="plan">Plan</button>
+    </nav>
+    <div id="restbar" class="restbar" hidden>
+      <div class="rb-text"><span id="restname">Rest</span><b id="resttime">0:00</b></div>
+      <button type="button" data-action="rest-add">+15 s</button>
+      <button type="button" data-action="rest-stop">Skip</button>
+    </div>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </div>
+
+  <noscript><p style="padding:24px">This app needs JavaScript turned on.</p></noscript>
+  <script src="/data.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
