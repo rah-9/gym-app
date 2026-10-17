@@ -99,7 +99,7 @@ window.GYM = (function () {
     DAYS: [REST, ARMS, CHEST, BACK, ARMS, CHEST, LEGS],
     HABITS: [
       { id: 'water', name: 'Water 3 to 4 litres' },
-      { id: 'steps', name: '8,000+ steps' },
+      { id: 'steps', name: '10,000+ steps' },
       { id: 'sleep', name: 'Slept 7 to 8 hours' },
       { id: 'nojunk', name: 'No sugar, cold drinks or fried snacks' }
     ],

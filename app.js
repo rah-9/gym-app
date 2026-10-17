@@ -200,7 +200,7 @@
     L.push('Workout score: ' + r.score + '% (' + r.done + ' of ' + r.total + ' items)');
     L.push('Days trained: ' + r.trained + ' of ' + r.trainDays + ' so far');
     L.push('Sets ticked: ' + r.sets + ', bonus exercises: ' + r.bonus);
-    L.push('Steps: ' + num(r.stepsTotal) + ' total, ' + num(r.stepsAvg) + ' a day on average, 8,000 goal hit on ' + r.stepsGoal + ' days');
+    L.push('Steps: ' + num(r.stepsTotal) + ' total, ' + num(r.stepsAvg) + ' a day on average, ' + num(STEP_GOAL) + ' goal hit on ' + r.stepsGoal + ' days');
     L.push('Habits: ' + r.habitsPct + '%, diet on plan: ' + r.mealsPct + '%');
     L.push('Current streak: ' + r.streak + ' training days');
     L.push('');
@@ -231,9 +231,9 @@
   function stepsPct(v) { return Math.min(100, Math.round((parseInt(v, 10) || 0) / STEP_GOAL * 100)); }
   function stepsNote(v) {
     var n = parseInt(v, 10) || 0;
-    if (!n) return 'Goal 8,000 a day. Copy the number from your phone\'s step counter.';
+    if (!n) return 'Goal ' + num(STEP_GOAL) + ' a day. Copy the number from your phone\'s step counter.';
     if (n >= STEP_GOAL) return 'Goal hit. ' + num(n) + ' steps.';
-    return num(STEP_GOAL - n) + ' more to reach 8,000.';
+    return num(STEP_GOAL - n) + ' more to reach ' + num(STEP_GOAL) + '.';
   }
 
   function summaryRows(r) {
@@ -242,7 +242,7 @@
       ['Days trained', r.trained + ' of ' + r.trainDays],
       ['Current streak', r.streak + ' full training days'],
       ['Sets ticked', r.sets + ' (bonus exercises: ' + r.bonus + ')'],
-      ['Steps', num(r.stepsTotal) + ' total, ' + num(r.stepsAvg) + ' a day, 8,000 hit on ' + r.stepsGoal + ' days'],
+      ['Steps', num(r.stepsTotal) + ' total, ' + num(r.stepsAvg) + ' a day, ' + num(STEP_GOAL) + ' hit on ' + r.stepsGoal + ' days'],
       ['Habits', r.habitsPct + '%'],
       ['Diet on plan (optional)', r.mealsPct + '%']
     ];
@@ -507,7 +507,7 @@
       ['Days trained', r.trained + '/' + r.trainDays, thisWeek ? 'so far this week' : 'training days'],
       ['Streak', r.streak, 'full training days in a row'],
       ['Sets ticked', r.sets, r.bonus + ' bonus exercises'],
-      ['Steps a day', num(r.stepsAvg), '8,000 goal hit ' + r.stepsGoal + ' days'],
+      ['Steps a day', num(r.stepsAvg), num(STEP_GOAL) + ' goal hit ' + r.stepsGoal + ' days'],
       ['Habits', r.habitsPct + '%', 'water, steps, sleep, no junk']
     ].map(function (t) {
       return '<div class="tile"><div class="tl">' + t[0] + '</div><div class="tv">' + t[1] + '</div><div class="ts">' + t[2] + '</div></div>';

@@ -17,7 +17,7 @@ Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
 - Reminder card when you open the app: yesterday missed or half done, morning window (6 to 10 AM) passed with nothing ticked, or items still left for an evening session.
 - Each kg box shows what you lifted last time, so you can add weight step by step.
 - Watch how to do it link under every exercise, plus a full Watch list in the Plan tab.
-- Steps box each day: type the number from your phone's step counter. Hitting 8,000 ticks the steps habit by itself.
+- Steps box each day: type the number from your phone's step counter. Hitting 10,000 ticks the steps habit by itself.
 - Cardio and daily habits (water, steps, sleep, no junk) as tick boxes. Diet plan is an optional fold-out section.
 - Notes for each day.
 - Report tab: weekly report for Monday to Sunday with workout score, days trained, sets, streak, habits, meals,
