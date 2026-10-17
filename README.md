@@ -29,8 +29,11 @@ Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
 
 ## Where the data lives
 
-Everything is stored in the browser on the phone you use (localStorage). Nothing is sent to any server.
-Use the same phone and browser every day. Use Plan > Download backup to keep a copy or move to a new phone.
+Everything is stored locally on the phone/browser you use. Nothing is sent to any server.
+- **Dual-Layer Local Auto-Backup:** The app automatically backs up your workouts every night and after every session into a browser database vault (IndexedDB + Storage).
+- **Persistent Storage:** Requests browser persistent storage to protect your data from automatic phone cache cleanups.
+- **Auto-Recovery:** If browser cache or active session data is accidentally cleared, the app automatically finds your latest local backup on startup and restores it.
+- **File Backups:** Go to **Plan > Download backup** to save a `.json` backup file directly to your phone's storage or transfer your data to a new device.
 
 ## Change the PIN
 

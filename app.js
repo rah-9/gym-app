@@ -35,7 +35,60 @@
   }
   function planFor(k) { return G.DAYS[dow(k)]; }
 
-  /* ---------- storage ---------- */
+  /* ---------- storage & auto-backup vault ---------- */
+  var AUTOBACKUP_KEY = 'gymlog.autobackup';
+  var IDB_NAME = 'gymlog_vault';
+  var IDB_STORE = 'backups';
+  var idbInstance = null;
+
+  function requestPersistentStorage() {
+    try {
+      if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().then(function () {}).catch(function () {});
+      }
+    } catch (e) {}
+  }
+
+  function openVault(cb) {
+    if (idbInstance) return cb && cb(idbInstance);
+    if (!window.indexedDB) return cb && cb(null);
+    try {
+      var req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = function (ev) {
+        var db = ev.target.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) {
+          db.createObjectStore(IDB_STORE, { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = function (ev) { idbInstance = ev.target.result; cb && cb(idbInstance); };
+      req.onerror = function () { cb && cb(null); };
+    } catch (e) { cb && cb(null); }
+  }
+
+  function vaultPut(id, payload, cb) {
+    openVault(function (db) {
+      if (!db) return cb && cb(false);
+      try {
+        var tx = db.transaction([IDB_STORE], 'readwrite');
+        tx.objectStore(IDB_STORE).put({ id: id, timestamp: Date.now(), date: todayKey(), payload: payload });
+        tx.oncomplete = function () { cb && cb(true); };
+        tx.onerror = function () { cb && cb(false); };
+      } catch (e) { cb && cb(false); }
+    });
+  }
+
+  function vaultGet(id, cb) {
+    openVault(function (db) {
+      if (!db) return cb && cb(null);
+      try {
+        var tx = db.transaction([IDB_STORE], 'readonly');
+        var req = tx.objectStore(IDB_STORE).get(id);
+        req.onsuccess = function () { cb && cb(req.result ? req.result.payload : null); };
+        req.onerror = function () { cb && cb(null); };
+      } catch (e) { cb && cb(null); }
+    });
+  }
+
   function load() {
     try {
       var s = JSON.parse(localStorage.getItem(KEY));
@@ -44,10 +97,75 @@
     return { days: {}, body: {}, settings: {} };
   }
   var S = load();
+
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(S)); }
     catch (e) { toast('Could not save on this browser. Check private mode.'); }
+
+    // Mirror to IndexedDB vault & localStorage backup snapshot (deep copy to avoid reference issues)
+    if (S && S.days && Object.keys(S.days).length > 0) {
+      var copy = JSON.parse(JSON.stringify(S));
+      var snap = { timestamp: Date.now(), dateKey: todayKey(), state: copy };
+      vaultPut('latest', snap);
+      try { localStorage.setItem(AUTOBACKUP_KEY, JSON.stringify(snap)); } catch (e) {}
+    }
   }
+
+  function performDailyAutoBackup(reason) {
+    if (!S || !S.days || Object.keys(S.days).length === 0) return;
+    var now = Date.now();
+    var copy = JSON.parse(JSON.stringify(S));
+    var snap = { timestamp: now, dateKey: todayKey(), reason: reason || 'daily_night', state: copy };
+    try { localStorage.setItem(AUTOBACKUP_KEY, JSON.stringify(snap)); } catch (e) {}
+    vaultPut('latest', snap);
+    vaultPut('daily_' + todayKey(), snap);
+    S.settings = S.settings || {};
+    S.settings.lastAutoBackup = now;
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+  }
+
+  function checkAutoBackupSchedule() {
+    if (!S || !S.days || Object.keys(S.days).length === 0) return;
+    var last = (S.settings && S.settings.lastAutoBackup) ? S.settings.lastAutoBackup : 0;
+    var now = Date.now();
+    var hoursSince = (now - last) / (1000 * 60 * 60);
+    var currentHour = (new Date()).getHours();
+    var lastDateKey = last ? keyOf(new Date(last)) : '';
+    var isNewDay = lastDateKey !== todayKey();
+
+    if (hoursSince >= 12 || (currentHour >= 21 && isNewDay) || !last) {
+      performDailyAutoBackup('nightly');
+    }
+  }
+
+  function checkAutoRestore(cb) {
+    var hasActiveDays = S && S.days && Object.keys(S.days).length > 0;
+    if (hasActiveDays) {
+      checkAutoBackupSchedule();
+      return cb && cb(false);
+    }
+
+    function applySnap(snap, src) {
+      if (!snap || !snap.state || !snap.state.days || Object.keys(snap.state.days).length === 0) return false;
+      S = { days: snap.state.days, body: snap.state.body || {}, settings: snap.state.settings || {} };
+      save();
+      toast('Auto-restored your data from ' + (src || 'local backup') + ' (' + (snap.dateKey || 'recent') + ')');
+      return true;
+    }
+
+    // 1. Try localStorage backup
+    try {
+      var raw = localStorage.getItem(AUTOBACKUP_KEY);
+      if (raw && applySnap(JSON.parse(raw), 'local backup')) return cb && cb(true);
+    } catch (e) {}
+
+    // 2. Try IndexedDB vault
+    vaultGet('latest', function (vaultSnap) {
+      if (applySnap(vaultSnap, 'browser vault')) return cb && cb(true);
+      cb && cb(false);
+    });
+  }
+
   var EMPTY = { done: {}, sets: {}, kg: {}, habits: {}, meals: {}, note: '' };
   function dayRead(k) { return S.days[k] || EMPTY; }
   function dayWrite(k) {
@@ -562,6 +680,13 @@
   }
 
   function renderPlan() {
+    var lastBackupStr = '';
+    if (S.settings && S.settings.lastAutoBackup) {
+      var lbDate = new Date(S.settings.lastAutoBackup);
+      var isToday = keyOf(lbDate) === todayKey();
+      var timeStr = pad(lbDate.getHours()) + ':' + pad(lbDate.getMinutes());
+      lastBackupStr = (isToday ? 'Today at ' : fmt(keyOf(lbDate)) + ' at ') + timeStr;
+    }
     var order = [1, 2, 3, 4, 5, 6, 0];
     var todayDow = dow(todayKey());
     var days = order.map(function (i) {
@@ -590,9 +715,27 @@
       '<li>Hit the top reps on every set, then add the smallest weight jump next time.</li>' +
       '<li>Never lock knees on leg press. Keep your back flat on every row and pulldown.</li>' +
       '<li>Every 6 to 8 weeks, one easy week at half the sets.</li></ul>' +
-      '<h2>Your data</h2><p class="muted">Everything is saved in this browser only. Download a backup now and then, or to move to another phone.</p>' +
+      '<h2>Your data</h2>' +
+      '<div class="card autobackup-box" style="margin-bottom:12px; padding:14px 16px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r);">' +
+      '<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">' +
+      '<div style="flex:1; min-width:200px;">' +
+      '<div style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:15px;">' +
+      '<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981;"></span>' +
+      'Local auto-backup active</div>' +
+      '<p class="muted" style="margin:4px 0 0; font-size:13px; line-height:1.4;">' +
+      'Auto-saved to phone browser vault (IndexedDB + Storage) every night & after workouts. Survives page close and browser cache clears.' +
+      '</p>' +
+      (lastBackupStr ? '<div class="muted" style="font-size:12px; margin-top:6px;">Last auto-backup: ' + esc(lastBackupStr) + '</div>' : '') +
+      '</div>' +
+      '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
+      '<button type="button" class="ghost" data-action="backup-now" style="min-height:36px; padding:0 12px; font-size:13px;">Backup now</button>' +
+      '<button type="button" class="ghost" data-action="restore-autobackup" style="min-height:36px; padding:0 12px; font-size:13px;">Restore</button>' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
+      '<p class="muted">Download a backup file to keep a permanent copy on your phone or move to another device.</p>' +
       '<div class="actions"><button type="button" class="ghost" data-action="export">Download backup</button>' +
-      '<label class="ghost filebtn">Restore backup<input type="file" id="importfile" accept="application/json,.json" hidden></label>' +
+      '<label class="ghost filebtn">Restore file<input type="file" id="importfile" accept="application/json,.json" hidden></label>' +
       '<button type="button" class="ghost" data-action="lock">Lock now</button>' +
       '<button type="button" class="danger" data-action="wipe">Erase all data</button></div>';
   }
@@ -711,11 +854,43 @@
       case 'doc-report': docReport(reportData(reportWs)); toast('Word report downloaded.'); break;
       case 'dismiss': S.settings.dismissed = todayKey(); save(); render(); break;
       case 'diet-toggle': S.settings.dietOpen = !el.parentElement.open; save(); break;
+      case 'backup-now':
+        performDailyAutoBackup('manual');
+        render();
+        toast('Auto-backup saved to browser vault.');
+        break;
+      case 'restore-autobackup':
+        vaultGet('latest', function (snap) {
+          if (!snap) {
+            try {
+              var raw = localStorage.getItem(AUTOBACKUP_KEY);
+              if (raw) snap = JSON.parse(raw);
+            } catch (e) {}
+          }
+          if (!snap || !snap.state || !snap.state.days || Object.keys(snap.state.days).length === 0) {
+            toast('No auto-backup found in this browser yet.');
+            return;
+          }
+          var count = Object.keys(snap.state.days).length;
+          var dStr = snap.dateKey || 'recent';
+          if (confirm('Restore auto-backup from ' + dStr + ' (' + count + ' days of data)?')) {
+            S = { days: snap.state.days, body: snap.state.body || {}, settings: snap.state.settings || {} };
+            save();
+            render();
+            toast('Restored ' + count + ' days from auto-backup.');
+          }
+        });
+        break;
       case 'export': download('gym-backup-' + todayKey() + '.json', JSON.stringify(S, null, 2), 'application/json'); break;
       case 'lock': try { localStorage.removeItem(UNLOCK_KEY); } catch (e) { /* ignore */ } showLock(); break;
       case 'wipe':
         if (!wipeArmed) { wipeArmed = true; el.textContent = 'Tap again to erase everything'; setTimeout(function () { wipeArmed = false; render(); }, 4000); break; }
-        wipeArmed = false; S = { days: {}, body: {}, settings: {} }; save(); render(); toast('All data erased.'); break;
+        wipeArmed = false;
+        S = { days: {}, body: {}, settings: {} };
+        try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+        try { localStorage.removeItem(AUTOBACKUP_KEY); } catch (e) {}
+        vaultPut('latest', null);
+        render(); toast('All data erased.'); break;
     }
   });
 
@@ -772,6 +947,10 @@
   function showApp() {
     $('#lock').hidden = true; $('#root').hidden = false;
     selDate = todayKey(); reportWs = weekStartOf(selDate);
+    requestPersistentStorage();
+    checkAutoRestore(function (restored) {
+      if (restored) render();
+    });
     render();
   }
   function drawDots() {
@@ -817,6 +996,12 @@
     else if (ev.key === 'Backspace') { entry = entry.slice(0, -1); drawDots(); }
   });
 
+  // Request persistent storage and check auto-restore on startup
+  requestPersistentStorage();
+  checkAutoRestore(function (restored) {
+    if (restored && !$('#root').hidden) render();
+  });
+
   // A new day starts a fresh list: re-render when the date changes while the app stays open.
   var lastDay = todayKey();
   setInterval(function () {
@@ -826,12 +1011,14 @@
       lastDay = now;
       if (!$('#root').hidden) render();
     }
+    checkAutoBackupSchedule();
   }, 30000);
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState !== 'visible') return;
     if (!isUnlocked()) { showLock(); return; }
     var now = todayKey();
     if (now !== lastDay) { if (selDate === lastDay) selDate = now; lastDay = now; render(); }
+    checkAutoBackupSchedule();
   });
 
   if (isUnlocked()) showApp(); else showLock();
