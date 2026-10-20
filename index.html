@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Rahul's Gym Log</title>
   <meta name="description" content="Daily gym checklist, rest timer and weekly report.">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Gym Log">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/icon.svg">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -40,7 +41,7 @@
       <button type="button" data-view="report">Report</button>
       <button type="button" data-view="plan">Plan</button>
     </nav>
-    <div id="restbar" class="restbar" hidden>
+    <div id="restbar" class="restbar" hidden role="timer" aria-live="off">
       <div class="rb-text"><span id="restname">Rest</span><b id="resttime">0:00</b></div>
       <button type="button" data-action="rest-add">+15 s</button>
       <button type="button" data-action="rest-stop">Skip</button>
@@ -49,7 +50,6 @@
   </div>
 
   <noscript><p style="padding:24px">This app needs JavaScript turned on.</p></noscript>
-  <script src="/data.js"></script>
-  <script src="/app.js"></script>
+  <script type="module" src="/js/main.js"></script>
 </body>
 </html>
