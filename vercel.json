@@ -10,7 +10,7 @@
       ]
     },
     {
-      "source": "/(app.js|data.js|styles.css)",
+      "source": "/(sw.js|styles.css|manifest.webmanifest|js/(.*))",
       "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
     }
   ]
