@@ -10,7 +10,11 @@
       ]
     },
     {
-      "source": "/(sw.js|styles.css|manifest.webmanifest|js/(.*))",
+      "source": "/(sw.js|styles.css|manifest.webmanifest)",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+    },
+    {
+      "source": "/js/:file*",
       "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
     }
   ]
