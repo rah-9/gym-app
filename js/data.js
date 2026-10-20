@@ -1,4 +1,4 @@
-/* Rahul's gym plan: Sandeep's split, matched to the machines in the gym.
+/* Rahul's gym plan: weekly split, matched to the machines in the gym.
    Edit this file to change exercises, sets, meals or the weekly schedule.
    Each exercise is one ex(...) line: id, name, machine, sets, reps, rest seconds, tip, video search words, bonus level.
    Ids must stay unique within a workout. */
@@ -35,7 +35,7 @@ const CHEST = {
   cardio: { name: 'Spin bike', detail: '15 min, steady pace' },
   exercises: [
     ex('pec-fly', 'Pec fly, facing out', 'Pec Fly & Rear Delt machine', 3, '12', 60, 'Slight bend in elbows, squeeze in the middle.', 'pec+deck+fly+machine+form'),
-    ex('incline-smith', 'Incline press (compulsory)', 'Smith machine + bench at 30 to 45 degrees', 3, '10', 120, 'Bar to upper chest. Sandeep said 60 to 70 degrees; 30 to 45 hits upper chest better.', 'smith+machine+incline+bench+press+form'),
+    ex('incline-smith', 'Incline press (compulsory)', 'Smith machine + bench at 30 to 45 degrees', 3, '10', 120, 'Bar to upper chest. 30 to 45 degrees hits the upper chest best.', 'smith+machine+incline+bench+press+form'),
     ex('flat-press', 'Flat chest press', 'Plate loaded chest press (flat bench, red arms)', 3, '8-10', 120, 'Handles at mid chest, feet flat.', 'plate+loaded+iso+lateral+bench+press'),
     ex('chest-press', 'Seated chest press', 'Chest press machine (pin stack)', 3, '10-12', 90, 'Smooth and controlled.', 'seated+chest+press+machine+form'),
     ex('db-press', 'Shoulder press', 'Bench upright + dumbbells', 3, '10', 90, 'Do not lock elbows at the top.', 'seated+dumbbell+shoulder+press+form'),

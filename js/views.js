@@ -170,7 +170,7 @@ function renderToday() {
   } else {
     const nx = nextUp(k);
     const nextId = nx && k === today ? nx.id : null;
-    body += '<h2>Workout <span class="h-note">in Sandeep\'s order</span></h2><ul class="list">' +
+    body += '<h2>Workout <span class="h-note">in this order</span></h2><ul class="list">' +
       mainExercises(p).map((e) => exerciseCard(e, d, false, e.id === nextId)).join('') + '</ul>';
     body += '<h2>Bonus <span class="h-note">if your body allows today</span></h2>' +
       '<ul class="list">' + bonusExercises(p).map((e) => exerciseCard(e, d, true, false)).join('') + '</ul>';
@@ -329,7 +329,7 @@ function dataSection() {
 }
 
 function renderPlan() {
-  return '<div class="eyebrow">Weekly plan</div><h1>Sandeep\'s split</h1>' +
+  return '<div class="eyebrow">Weekly plan</div><h1>Your split</h1>' +
     '<p class="muted">Each day starts with a fresh checklist. Bonus exercises are there every day, do them when your body allows.</p>' +
     scheduleEditor() +
     '<h2>Workouts</h2>' + workoutList() + goalLegend() +
