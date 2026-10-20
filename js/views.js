@@ -1,9 +1,9 @@
 /* Screens: Today, Report and Plan. Each returns an HTML string; render() puts it on the page. */
-import { WORKOUTS, WARMUP, HABITS, MEALS } from './data.js';
+import { WORKOUTS, WARMUP, HABITS, MEALS, GOALS } from './data.js';
 import { S } from './store.js';
 import {
   planFor, workoutKeyFor, schedule, dayRead, dayStats, dayStatus, hasProgress, mainExercises, bonusExercises,
-  lastKg, nextUp, programWeek, counts, stepsPct, STEP_GOAL, STATUS_LABEL, WEEK_ORDER
+  weightHint, musclesFor, nextUp, programWeek, counts, stepsPct, STEP_GOAL, STATUS_LABEL, WEEK_ORDER
 } from './plan.js';
 import { reportData } from './report.js';
 import * as notify from './notify.js';
@@ -36,6 +36,16 @@ function checkbox(action, id, on, label) {
     '" role="checkbox" aria-checked="' + on + '" aria-label="' + esc(label) + '"></button>';
 }
 
+// "Works: Chest, Front shoulders · also Triceps" plus the goal tag.
+function works(e) {
+  const g = GOALS[e.goal];
+  if (!(e.main && e.main.length) && !g) return '';
+  return '<div class="works">' + (g ? '<span class="goal g-' + e.goal + '">' + esc(g.label) + '</span>' : '') +
+    (e.main && e.main.length ? '<span class="wk">Works <b>' + e.main.map(esc).join(', ') + '</b>' +
+      (e.also && e.also.length ? '<span class="also"> &middot; also ' + e.also.map(esc).join(', ') + '</span>' : '') + '</span>' : '') +
+    '</div>';
+}
+
 function exerciseCard(e, d, isBonus, isNext) {
   const done = !!d.done[e.id];
   const sets = d.sets[e.id] || [];
@@ -47,12 +57,14 @@ function exerciseCard(e, d, isBonus, isNext) {
     }
   }
   const hasKg = !(e.id === 'warmup' || /plank/.test(e.id));
-  const last = hasKg ? lastKg(ui.selDate, e.id) : null;
+  const last = hasKg ? weightHint(ui.selDate, e) : null;
   const kgField = hasKg
     ? '<label class="kg"><input type="number" inputmode="decimal" min="0" step="0.5" data-kg="' + esc(e.id) +
       '" value="' + esc(d.kg[e.id] || '') + '" placeholder="' + (last ? last.kg : '0') + '" aria-label="' + esc(e.name) + ' weight"><span>kg</span></label>'
     : '';
-  const lastNote = last ? '<span class="last">Last time ' + last.kg + ' kg (' + DAY_SHORT[dow(last.k)] + ' ' + fmt(last.k) + ')</span>' : '';
+  const lastNote = !last ? '' : last.allSets && !d.kg[e.id]
+    ? '<span class="last up-hint">Last time ' + last.kg + ' kg, all sets done. If the reps felt easy, try <b>' + last.next + ' kg</b>.</span>'
+    : '<span class="last">Last time ' + last.kg + ' kg (' + DAY_SHORT[dow(last.k)] + ' ' + fmt(last.k) + ')</span>';
   const restBtn = e.rest ? '<button type="button" class="chip" data-action="rest" data-sec="' + e.rest + '" data-name="' + esc(e.name) + '">Rest ' + restLabel(e.rest) + '</button>' : '';
   const video = e.video ? '<div class="watchrow"><a class="watch" href="' + esc(e.video) + '" target="_blank" rel="noopener">Watch how to do it <span aria-hidden="true">&#8599;</span></a></div>' : '';
   const tools = dots || kgField || restBtn
@@ -61,16 +73,16 @@ function exerciseCard(e, d, isBonus, isNext) {
     '<div class="row">' + checkbox('done', e.id, done, 'Mark ' + e.name + ' done') +
     '<div class="body">' + (isNext ? '<span class="upnext">Up next</span>' : '') +
     '<div class="name">' + (isBonus ? '<span class="tag">Bonus</span>' : '') + esc(e.name) + '</div>' +
-    '<div class="machine">' + esc(e.machine) + '</div>' +
+    '<div class="machine">' + esc(e.machine) + '</div>' + works(e) +
     '<div class="meta"><span class="sets-reps">' + (e.id === 'warmup' ? esc(e.reps) : e.sets + ' &times; ' + esc(e.reps)) + '</span>' +
     (e.rest ? '<span class="muted">rest ' + restLabel(e.rest) + '</span>' : '') + '</div>' +
     (e.tip ? '<div class="tip">' + esc(e.tip) + '</div>' : '') +
     '</div></div>' + tools + video + '</li>';
 }
 
-function simpleCard(action, id, on, name, detail) {
+function simpleCard(action, id, on, name, detail, info) {
   return '<li class="card' + (on ? ' done' : '') + '"><div class="row">' + checkbox(action, id, on, name) +
-    '<div class="body"><div class="name">' + esc(name) + '</div>' + (detail ? '<div class="tip">' + esc(detail) + '</div>' : '') + '</div></div></li>';
+    '<div class="body"><div class="name">' + esc(name) + '</div>' + (info ? works(info) : '') + (detail ? '<div class="tip">' + esc(detail) + '</div>' : '') + '</div></div></li>';
 }
 
 function weekStrip(k) {
@@ -107,6 +119,7 @@ function hero(k) {
     '<h1>' + esc(p.focus) + '</h1>' +
     '<div class="hero-sub">' + st.done + ' of ' + st.total + ' done' + (st.sets ? ' &middot; ' + st.sets + ' sets' : '') + '</div>' +
     '</div>' + ring(st.pct) + '</div>' +
+    (musclesFor(p).length ? '<div class="hero-muscles"><span>Works today</span>' + musclesFor(p).map((m) => '<i>' + esc(m) + '</i>').join('') + '</div>' : '') +
     (sub ? '<div class="hero-next">' + esc(sub) + '</div>' : '') + swap +
     '</section>';
 }
@@ -152,7 +165,7 @@ function renderToday() {
   const k = ui.selDate, p = planFor(k), d = dayRead(k), today = todayKey();
   let body = '';
   if (p.rest) {
-    body += '<h2>Rest day</h2><ul class="list">' + p.tasks.map((t) => simpleCard('done', t.id, !!d.done[t.id], t.name, t.detail)).join('') + '</ul>' +
+    body += '<h2>Rest day</h2><ul class="list">' + p.tasks.map((t) => simpleCard('done', t.id, !!d.done[t.id], t.name, t.detail, t)).join('') + '</ul>' +
       '<button type="button" class="primary wide" data-action="go-report">Open this week\'s report</button>';
   } else {
     const nx = nextUp(k);
@@ -161,7 +174,7 @@ function renderToday() {
       mainExercises(p).map((e) => exerciseCard(e, d, false, e.id === nextId)).join('') + '</ul>';
     body += '<h2>Bonus <span class="h-note">if your body allows today</span></h2>' +
       '<ul class="list">' + bonusExercises(p).map((e) => exerciseCard(e, d, true, false)).join('') + '</ul>';
-    body += '<h2>Cardio</h2><ul class="list">' + simpleCard('done', 'cardio', !!d.done.cardio, p.cardio.name, p.cardio.detail) + '</ul>';
+    body += '<h2>Cardio</h2><ul class="list">' + simpleCard('done', 'cardio', !!d.done.cardio, p.cardio.name, p.cardio.detail, p.cardio) + '</ul>';
   }
 
   const steps = d.steps || '';
@@ -272,11 +285,18 @@ function workoutList() {
     if (!days.length) return '';
     const list = p.rest
       ? p.tasks.map((t) => '<li>' + esc(t.name) + ' <span class="muted">' + esc(t.detail) + '</span></li>').join('')
-      : mainExercises(p).map((e) => '<li>' + esc(e.name) + ' <span class="muted">' + (e.id === WARMUP.id ? esc(e.reps) : e.sets + ' x ' + esc(e.reps)) + '</span></li>').join('') +
+      : mainExercises(p).map((e) => '<li>' + esc(e.name) + ' <span class="muted">' + (e.id === WARMUP.id ? esc(e.reps) : e.sets + ' x ' + esc(e.reps)) + '</span>' +
+          (e.id !== WARMUP.id && e.main.length ? '<span class="plan-works">' + e.main.map(esc).join(', ') + '</span>' : '') + '</li>').join('') +
         bonusExercises(p).map((e) => '<li class="b">Bonus ' + e.bonus + ': ' + esc(e.name) + ' <span class="muted">' + e.sets + ' x ' + esc(e.reps) + '</span></li>').join('') +
         '<li>Cardio: ' + esc(p.cardio.name) + ' <span class="muted">' + esc(p.cardio.detail) + '</span></li>';
     return '<details class="plan-day"' + (p.key === todayW ? ' open' : '') + '><summary><b>' + esc(p.focus) + '</b> <span class="muted">' + days.join(', ') + '</span></summary><ol>' + list + '</ol></details>';
   }).join('');
+}
+
+function goalLegend() {
+  return '<h2>What the tags mean</h2><ul class="legend">' + Object.keys(GOALS).map((k) =>
+    '<li><span class="goal g-' + k + '">' + esc(GOALS[k].label) + '</span><span>' + esc(GOALS[k].why) + '</span></li>').join('') + '</ul>' +
+    '<p class="muted small">Losing weight: every lift counts, not just cardio. Lifting keeps your muscle while the diet and steps burn fat, so the weight you lose is fat.</p>';
 }
 
 function watchList() {
@@ -312,7 +332,7 @@ function renderPlan() {
   return '<div class="eyebrow">Weekly plan</div><h1>Sandeep\'s split</h1>' +
     '<p class="muted">Each day starts with a fresh checklist. Bonus exercises are there every day, do them when your body allows.</p>' +
     scheduleEditor() +
-    '<h2>Workouts</h2>' + workoutList() +
+    '<h2>Workouts</h2>' + workoutList() + goalLegend() +
     notifySection() +
     '<h2>Watch list</h2><p class="muted">How to do each exercise. Opens YouTube.</p>' + watchList() +
     '<h2>Rules</h2><ul class="plain"><li>Last 1 to 2 reps hard, form clean. Never to failure for now.</li>' +

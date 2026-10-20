@@ -97,6 +97,74 @@ const REST = {
   ]
 };
 
+/* What each exercise works and what it is for. Shown on every card.
+   main: muscles doing most of the work. also: helpers. goal: a key from GOALS. */
+export const GOALS = {
+  strength: { label: 'Strength + muscle', why: 'Big lift: builds strength and burns the most calories of any lift.' },
+  muscle: { label: 'Muscle growth', why: 'Targets one muscle to build size and shape.' },
+  core: { label: 'Core strength', why: 'Protects your lower back and helps every other lift.' },
+  fatburn: { label: 'Fat burn', why: 'Raises heart rate and burns fat. Good for heart health.' },
+  warmup: { label: 'Warm up', why: 'Gets blood flowing so joints and muscles are ready.' },
+  recovery: { label: 'Recovery', why: 'Helps muscles repair so you come back stronger.' }
+};
+
+const TARGETS = {
+  warmup: { main: ['Whole body'], also: [], goal: 'warmup' },
+  // Biceps + triceps
+  'curl-machine': { main: ['Biceps'], also: ['Forearms'], goal: 'muscle' },
+  'preacher-db': { main: ['Biceps (lower part)'], also: ['Forearms'], goal: 'muscle' },
+  'bar-curl': { main: ['Biceps'], also: ['Forearms', 'Front shoulders'], goal: 'strength' },
+  'tri-press': { main: ['Triceps'], also: ['Lower chest', 'Front shoulders'], goal: 'strength' },
+  vbar: { main: ['Triceps (outer)'], also: [], goal: 'muscle' },
+  'straight-bar': { main: ['Triceps'], also: [], goal: 'muscle' },
+  hammer: { main: ['Biceps', 'Forearms'], also: ['Brachialis (arm thickness)'], goal: 'muscle' },
+  'oh-ext': { main: ['Triceps (long head)'], also: ['Core'], goal: 'muscle' },
+  // Chest + shoulders
+  'pec-fly': { main: ['Chest'], also: ['Front shoulders'], goal: 'muscle' },
+  'incline-smith': { main: ['Upper chest'], also: ['Front shoulders', 'Triceps'], goal: 'strength' },
+  'flat-press': { main: ['Chest'], also: ['Front shoulders', 'Triceps'], goal: 'strength' },
+  'chest-press': { main: ['Chest'], also: ['Front shoulders', 'Triceps'], goal: 'strength' },
+  'db-press': { main: ['Shoulders (front + side)'], also: ['Triceps', 'Upper chest'], goal: 'strength' },
+  'cable-lat': { main: ['Side shoulders'], also: ['Traps'], goal: 'muscle' },
+  'db-lateral': { main: ['Side shoulders'], also: ['Traps'], goal: 'muscle' },
+  'incline-fly': { main: ['Upper chest'], also: ['Front shoulders'], goal: 'muscle' },
+  // Back + light legs
+  'front-lat': { main: ['Lats (back width)'], also: ['Biceps', 'Rear shoulders'], goal: 'strength' },
+  'close-pull': { main: ['Lats', 'Mid back'], also: ['Biceps'], goal: 'strength' },
+  'seated-row': { main: ['Mid back', 'Lats'], also: ['Rear shoulders', 'Biceps'], goal: 'strength' },
+  'db-row': { main: ['Lats', 'Mid back'], also: ['Biceps', 'Rear shoulders'], goal: 'strength' },
+  'rear-delt': { main: ['Rear shoulders'], also: ['Upper back'], goal: 'muscle' },
+  'back-ext': { main: ['Lower back'], also: ['Glutes', 'Hamstrings'], goal: 'core' },
+  'leg-press-light': { main: ['Quads (front thigh)', 'Glutes'], also: ['Hamstrings'], goal: 'strength' },
+  'leg-ext-light': { main: ['Quads (front thigh)'], also: [], goal: 'muscle' },
+  plank: { main: ['Core (abs)'], also: ['Shoulders', 'Lower back'], goal: 'core' },
+  'straight-arm': { main: ['Lats'], also: ['Triceps', 'Core'], goal: 'muscle' },
+  shrug: { main: ['Traps'], also: ['Forearms (grip)'], goal: 'muscle' },
+  // Legs
+  'leg-press': { main: ['Quads (front thigh)', 'Glutes'], also: ['Hamstrings', 'Calves'], goal: 'strength' },
+  'super-squat': { main: ['Quads (front thigh)', 'Glutes'], also: ['Hamstrings', 'Core'], goal: 'strength' },
+  rdl: { main: ['Hamstrings (back thigh)', 'Glutes'], also: ['Lower back', 'Forearms (grip)'], goal: 'strength' },
+  'leg-ext': { main: ['Quads (front thigh)'], also: [], goal: 'muscle' },
+  'leg-curl': { main: ['Hamstrings (back thigh)'], also: ['Calves'], goal: 'muscle' },
+  'add-abd': { main: ['Inner thighs', 'Outer hips (glutes)'], also: [], goal: 'muscle' },
+  calf: { main: ['Calves'], also: [], goal: 'muscle' },
+  'front-lat-sat': { main: ['Lats (back width)'], also: ['Biceps', 'Rear shoulders'], goal: 'strength' },
+  'plank-sat': { main: ['Core (abs)'], also: ['Shoulders', 'Lower back'], goal: 'core' },
+  lunges: { main: ['Quads', 'Glutes'], also: ['Hamstrings', 'Core (balance)'], goal: 'strength' },
+  'smith-squat': { main: ['Quads (front thigh)', 'Glutes'], also: ['Hamstrings', 'Core'], goal: 'strength' },
+  // Cardio and rest-day tasks
+  cardio: { main: ['Heart + lungs'], also: ['Legs'], goal: 'fatburn' },
+  walk: { main: ['Heart + lungs'], also: ['Legs'], goal: 'fatburn' },
+  weigh: { main: [], also: [], goal: '' },
+  stretch: { main: ['Hips', 'Hamstrings', 'Lower back'], also: [], goal: 'recovery' }
+};
+
+// Attach the info so every card can read e.main / e.also / e.goal.
+const attach = (o, id) => Object.assign(o, TARGETS[id] || { main: [], also: [], goal: '' });
+attach(WARMUP, 'warmup');
+[ARMS, CHEST, BACK, LEGS].forEach((w) => { w.exercises.forEach((e) => attach(e, e.id)); attach(w.cardio, 'cardio'); });
+REST.tasks.forEach((t) => attach(t, t.id));
+
 // Every workout the schedule can use, by key.
 export const WORKOUTS = { push: CHEST, arms: ARMS, back: BACK, legs: LEGS, rest: REST };
 

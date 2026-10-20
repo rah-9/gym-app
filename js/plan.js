@@ -93,6 +93,27 @@ export function lastKg(k, id) {
   return null;
 }
 
+// Last weight used, and a suggested next weight when every set was finished that day.
+export function weightHint(k, e) {
+  const last = lastKg(k, e.id);
+  if (!last) return null;
+  const done = ((S.days[last.k] || {}).sets || {})[e.id] || [];
+  const allSets = e.sets > 1 && done.length >= e.sets && done.slice(0, e.sets).every(Boolean);
+  const step = last.kg < 10 ? 1 : 2.5;
+  return { kg: last.kg, k: last.k, allSets, next: Math.round((last.kg + step) * 10) / 10 };
+}
+
+// Main muscles a workout trains, short names, in order of first use.
+export function musclesFor(p) {
+  if (p.rest) return [];
+  const seen = new Set();
+  mainExercises(p).forEach((e) => (e.main || []).forEach((m) => {
+    const short = m.replace(/\s*\(.*\)/, '');
+    if (short !== 'Whole body') seen.add(short);
+  }));
+  return Array.from(seen);
+}
+
 /* ---------- stats ---------- */
 export function dayStats(k) {
   const d = dayRead(k), p = planFor(k), req = requiredItems(k);
