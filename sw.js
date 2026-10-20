@@ -1,6 +1,6 @@
 /* Service worker: makes the installed app work offline, shows notifications,
    and runs the rest countdown so "Rest over" arrives even with the screen off. */
-const CACHE = 'gymlog-v3';
+const CACHE = 'gymlog-v4';
 const SHELL = [
   '/', '/styles.css', '/manifest.webmanifest', '/icon.svg',
   '/icons/icon-192.png', '/icons/icon-512.png', '/icons/badge-96.png',

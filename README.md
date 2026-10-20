@@ -1,6 +1,6 @@
 # Rahul's Gym Log
 
-Daily gym checklist built from Sandeep's split, matched to the machines at the gym.
+Daily gym checklist built from a weekly split, matched to the machines at the gym.
 Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
 
 ## What it does
