@@ -1,17 +1,23 @@
 # Rahul's Gym Log
 
-Daily gym checklist built from Sandeep's split, matched to the machines at the gym.
+Daily gym checklist built from a weekly split, matched to the machines at the gym.
 Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
 
 ## What it does
 
 - PIN lock (4 digits). Opens as soon as the 4th digit is right, then stays open for 12 hours on that phone.
 - Today tab: the checklist for today's weekday. Every new day starts a fresh list.
-  - Monday and Thursday: biceps + triceps
-  - Tuesday and Friday: chest + shoulders
+  - Monday and Thursday: chest + shoulders
+  - Tuesday and Friday: biceps + triceps
   - Wednesday: back + light legs
   - Saturday: legs focus + 1 back exercise
   - Sunday: rest day (walk, weigh in, stretch)
+  - Change any day in Plan > Your week. Before you tick anything, you can also switch a single day's workout from the Today card.
+    Days you already logged keep the workout they were logged under, so changing the week never rewrites history.
+- Each exercise card shows what it works (main muscles, helper muscles) and a goal tag:
+  Strength + muscle, Muscle growth, Core strength, Fat burn, Warm up or Recovery. The Plan tab explains each tag.
+- The Today card lists the muscles the day trains.
+- If you finished every set last time, the kg box suggests the next small step up (+2.5 kg, or +1 kg under 10 kg).
 - Each exercise card: tick box, set buttons (tapping a set starts the rest timer), kg box.
 - Bonus exercises are shown every day under the main workout. Do them when your body allows; they do not lower your score if skipped.
 - Reminder card when you open the app: yesterday missed or half done, morning window (6 to 10 AM) passed with nothing ticked, or items still left for an evening session.
@@ -25,7 +31,12 @@ Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
   Download it as a PDF or a Word (.doc) file, or copy it as text. On Sunday the app reminds you the report is ready.
   The PDF maker (jsPDF) loads from cdnjs only when you tap Download PDF, so the app stays light.
 - Plan tab: the full week, watch list, rules, backup download/restore, lock, erase.
-- Can be added to the phone home screen like an app.
+- Can be added to the phone home screen like an app, and works offline once opened.
+- Phone notifications (turn on from the Today card or Plan > Notifications):
+  - Workout progress after every tick ("Arms day · 4 of 8, up next: V-bar pushdown").
+  - Rest timer with +15 s and Skip buttons, and "Rest over" with vibration even when the screen is off.
+  - Works on Android Chrome. On iPhone it needs iOS 16.4+ and the app opened from the Home Screen.
+  - There is no server, so the app cannot send reminders while it is fully closed.
 
 ## Where the data lives
 
@@ -37,7 +48,7 @@ Everything is stored locally on the phone/browser you use. Nothing is sent to an
 
 ## Change the PIN
 
-The PIN is stored as a SHA-256 hash in `app.js` (`PIN_HASH`). To change it:
+The PIN is stored as a SHA-256 hash in `js/lock.js` (`PIN_HASH`). To change it:
 
     printf '1234' | sha256sum
 
@@ -46,7 +57,23 @@ This is a simple screen lock to keep the page private on your phone, not bank-le
 
 ## Change exercises or meals
 
-Edit `data.js`. Each exercise is one `ex(...)` line: id, name, machine, sets, reps, rest seconds, tip, video search words, bonus level.
+Edit `js/data.js` (the default week is `SCHEDULE` there). Each exercise is one `ex(...)` line: id, name, machine, sets, reps, rest seconds, tip, video search words, bonus level.
+What it works and its goal tag live in `TARGETS` in the same file, keyed by the exercise id.
+
+## Code layout
+
+No build step. Plain ES modules loaded by `index.html`:
+
+- `js/data.js`: exercises, workouts, default week, habits, meals
+- `js/store.js`: saving, auto-backup vault, restore
+- `js/plan.js`: which workout a day gets, stats, streak
+- `js/views.js`: the Today, Report and Plan screens
+- `js/report.js`: weekly report and PDF/Word downloads
+- `js/notify.js` + `sw.js`: notifications, rest timer in the background, offline cache
+- `js/timer.js`, `js/lock.js`: rest bar, PIN screen
+- `js/main.js`: taps, typing and start-up
+
+After changing files, bump `CACHE` in `sw.js` so installed phones drop the old offline copy.
 
 ## Run locally
 
