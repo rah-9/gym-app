@@ -14,6 +14,10 @@ Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
   - Sunday: rest day (walk, weigh in, stretch)
   - Change any day in Plan > Your week. Before you tick anything, you can also switch a single day's workout from the Today card.
     Days you already logged keep the workout they were logged under, so changing the week never rewrites history.
+- Each exercise card shows what it works (main muscles, helper muscles) and a goal tag:
+  Strength + muscle, Muscle growth, Core strength, Fat burn, Warm up or Recovery. The Plan tab explains each tag.
+- The Today card lists the muscles the day trains.
+- If you finished every set last time, the kg box suggests the next small step up (+2.5 kg, or +1 kg under 10 kg).
 - Each exercise card: tick box, set buttons (tapping a set starts the rest timer), kg box.
 - Bonus exercises are shown every day under the main workout. Do them when your body allows; they do not lower your score if skipped.
 - Reminder card when you open the app: yesterday missed or half done, morning window (6 to 10 AM) passed with nothing ticked, or items still left for an evening session.
@@ -54,6 +58,7 @@ This is a simple screen lock to keep the page private on your phone, not bank-le
 ## Change exercises or meals
 
 Edit `js/data.js` (the default week is `SCHEDULE` there). Each exercise is one `ex(...)` line: id, name, machine, sets, reps, rest seconds, tip, video search words, bonus level.
+What it works and its goal tag live in `TARGETS` in the same file, keyed by the exercise id.
 
 ## Code layout
 

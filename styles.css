@@ -301,3 +301,30 @@ select {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ---------- muscles + goals ---------- */
+.works { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 4px 0 2px; font-size: 14px; color: var(--ink-2); }
+.works b { font-weight: 600; color: var(--ink); }
+.works .also { color: var(--muted); }
+.card.done .works b { color: var(--muted); }
+.goal { display: inline-block; flex: none; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); }
+.goal.g-strength { background: #e8f0fe; color: #174ea6; }
+.goal.g-muscle { background: #f3e8fd; color: #6b21a8; }
+.goal.g-core { background: #e6f4ea; color: #137333; }
+.goal.g-fatburn { background: var(--accent-soft); color: #b3410a; }
+.goal.g-warmup, .goal.g-recovery { background: var(--surface-2); color: var(--ink-2); }
+@media (prefers-color-scheme: dark) {
+  .goal.g-strength { background: #1c2b45; color: #a8c7fa; }
+  .goal.g-muscle { background: #2d1f3d; color: #d7b8f5; }
+  .goal.g-core { background: #17301f; color: #8fd6a3; }
+  .goal.g-fatburn { color: #ffb38a; }
+}
+.hero-muscles { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
+.hero-muscles span { font-size: 13px; color: var(--hero-muted); margin-right: 2px; }
+.hero-muscles i { font-style: normal; font-size: 13px; font-weight: 500; padding: 3px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.1); }
+.up-hint { color: var(--ink-2); }
+.up-hint b { color: var(--accent); }
+.plan-works { display: block; font-size: 13px; color: var(--muted); }
+.legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.legend li { display: flex; gap: 10px; align-items: baseline; font-size: 14px; color: var(--ink-2); }
+.legend .goal { min-width: 118px; text-align: center; }
