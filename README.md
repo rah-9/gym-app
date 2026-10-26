@@ -7,10 +7,12 @@ Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
 
 - PIN lock (4 digits). Opens as soon as the 4th digit is right, then stays open for 12 hours on that phone.
 - Today tab: the checklist for today's weekday. Every new day starts a fresh list.
-  - Monday and Thursday: chest + shoulders
-  - Tuesday and Friday: biceps + triceps
+  - Monday: chest + a little shoulder
+  - Tuesday: biceps + triceps
   - Wednesday: back + light legs
-  - Saturday: legs focus + 1 back exercise
+  - Thursday: shoulders + a little upper chest
+  - Friday: arms (different moves from Tuesday) + shoulder finisher + plank
+  - Saturday: legs only
   - Sunday: rest day (walk, weigh in, stretch)
   - Change any day in Plan > Your week. Before you tick anything, you can also switch a single day's workout from the Today card.
     Days you already logged keep the workout they were logged under, so changing the week never rewrites history.
