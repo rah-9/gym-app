@@ -61,14 +61,15 @@ function notifyOn() {
 let wipeArmed = false;
 const ACTIONS = {
   done: (el) => toggleDone(el.dataset.id),
+  expand: (el) => { const id = el.dataset.id; ui.open[id] = el.getAttribute('aria-expanded') !== 'true'; render(); },
   set: (el) => toggleSet(el.dataset.id, +el.dataset.i),
   habit: (el) => { const d = dayWrite(ui.selDate); d.habits[el.dataset.id] = !d.habits[el.dataset.id]; save(); render(); },
   meal: (el) => { const d = dayWrite(ui.selDate); d.meals[el.dataset.id] = !d.meals[el.dataset.id]; save(); render(); },
   rest: (el) => startRest(+el.dataset.sec, el.dataset.name),
   'rest-stop': () => stopRest(false),
   'rest-add': () => addRest(15000),
-  pick: (el) => { ui.selDate = el.dataset.k; render(); top(); },
-  shift: (el) => { ui.selDate = addDays(ui.selDate, +el.dataset.n); render(); },
+  pick: (el) => { ui.selDate = el.dataset.k; ui.open = {}; render(); top(); },
+  shift: (el) => { ui.selDate = addDays(ui.selDate, +el.dataset.n); ui.open = {}; render(); },
   rweek: (el) => { ui.reportWs = addDays(ui.reportWs, +el.dataset.n); render(); },
   'go-report': () => { ui.view = 'report'; ui.reportWs = weekStartOf(ui.selDate); render(); top(); },
   'save-body': () => {

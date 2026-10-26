@@ -10,7 +10,7 @@ import { reportData, bestLabel } from './report.js';
 import * as notify from './notify.js';
 import { $, esc, fmt, keyOf, fromKey, addDays, todayKey, weekStartOf, weekDays, dow, num, restLabel, clockTime, DAY_NAMES, DAY_SHORT } from './util.js';
 
-export const ui = { view: 'today', selDate: todayKey(), reportWs: weekStartOf(todayKey()) };
+export const ui = { view: 'today', selDate: todayKey(), reportWs: weekStartOf(todayKey()), open: {} };
 
 export function render() {
   const v = $('#view');
@@ -47,9 +47,13 @@ function works(e) {
     '</div>';
 }
 
+// Compact card: name, sets x reps, machine, then set buttons + kg + video link.
+// Tap the name to open the tip, what it works and the rest timer. The "up next" card opens by itself.
 function exerciseCard(e, d, isBonus, isNext) {
   const done = !!d.done[e.id];
   const sets = d.sets[e.id] || [];
+  const open = ui.open[e.id] != null ? ui.open[e.id] : isNext;
+  const dosage = e.id === 'warmup' ? esc(e.reps) : e.sets + ' &times; ' + esc(e.reps);
   let dots = '';
   if (e.id !== 'warmup') {
     for (let i = 0; i < e.sets; i++) {
@@ -57,33 +61,35 @@ function exerciseCard(e, d, isBonus, isNext) {
         '" data-i="' + i + '" aria-label="Set ' + (i + 1) + '">' + (i + 1) + '</button>';
     }
   }
-  const hasKg = !(e.id === 'warmup' || /plank/.test(e.id));
+  const hasKg = !(e.id === 'warmup' || /plank|pushup/.test(e.id));
   const last = hasKg ? weightHint(ui.selDate, e) : null;
   const kgField = hasKg
     ? '<label class="kg"><input type="number" inputmode="decimal" min="0" step="0.5" data-kg="' + esc(e.id) +
       '" value="' + esc(d.kg[e.id] || '') + '" placeholder="' + (last ? last.kg : '0') + '" aria-label="' + esc(e.name) + ' weight"><span>kg</span></label>'
     : '';
   const lastNote = !last ? '' : last.allSets && !d.kg[e.id]
-    ? '<span class="last up-hint">Last time ' + last.kg + ' kg, all sets done. If the reps felt easy, try <b>' + last.next + ' kg</b>.</span>'
-    : '<span class="last">Last time ' + last.kg + ' kg (' + DAY_SHORT[dow(last.k)] + ' ' + fmt(last.k) + ')</span>';
-  const restBtn = e.rest ? '<button type="button" class="chip" data-action="rest" data-sec="' + e.rest + '" data-name="' + esc(e.name) + '">Rest ' + restLabel(e.rest) + '</button>' : '';
-  const video = e.video ? '<div class="watchrow"><a class="watch" href="' + esc(e.video) + '" target="_blank" rel="noopener">Watch how to do it <span aria-hidden="true">&#8599;</span></a></div>' : '';
-  const tools = dots || kgField || restBtn
-    ? '<div class="tools">' + (dots ? '<div class="dots">' + dots + '</div>' : '') + kgField + restBtn + lastNote + '</div>' : '';
-  return '<li class="card' + (done ? ' done' : '') + (isBonus ? ' bonus' : '') + (isNext ? ' next' : '') + '">' +
+    ? '<span class="last up-hint">Try <b>' + last.next + ' kg</b>, last ' + last.kg + '</span>'
+    : '<span class="last">Last ' + last.kg + ' kg</span>';
+  const watch = e.video ? '<a class="watch" href="' + esc(e.video) + '" target="_blank" rel="noopener" aria-label="Watch how to do ' + esc(e.name) + '">How to <span aria-hidden="true">&#8599;</span></a>' : '';
+  const tools = (!done || open) && (dots || kgField || watch)
+    ? '<div class="tools">' + (dots ? '<div class="dots">' + dots + '</div>' : '') + kgField + lastNote + watch + '</div>' : '';
+  const more = open
+    ? '<div class="more">' + (e.tip ? '<p class="tip">' + esc(e.tip) + '</p>' : '') + works(e) +
+      (e.rest ? '<button type="button" class="chip" data-action="rest" data-sec="' + e.rest + '" data-name="' + esc(e.name) + '">Start rest timer, ' + restLabel(e.rest) + '</button>' : '') + '</div>'
+    : '';
+  return '<li class="card ex' + (done ? ' done' : '') + (isBonus ? ' bonus' : '') + (isNext ? ' next' : '') + (open ? ' open' : '') + '">' +
     '<div class="row">' + checkbox('done', e.id, done, 'Mark ' + e.name + ' done') +
-    '<div class="body">' + (isNext ? '<span class="upnext">Up next</span>' : '') +
-    '<div class="name">' + (isBonus ? '<span class="tag">Bonus</span>' : '') + esc(e.name) + '</div>' +
-    '<div class="machine">' + esc(e.machine) + '</div>' + works(e) +
-    '<div class="meta"><span class="sets-reps">' + (e.id === 'warmup' ? esc(e.reps) : e.sets + ' &times; ' + esc(e.reps)) + '</span>' +
-    (e.rest ? '<span class="muted">rest ' + restLabel(e.rest) + '</span>' : '') + '</div>' +
-    (e.tip ? '<div class="tip">' + esc(e.tip) + '</div>' : '') +
-    '</div></div>' + tools + video + '</li>';
+    '<button type="button" class="ex-main" data-action="expand" data-id="' + esc(e.id) + '" aria-expanded="' + open + '">' +
+    '<span class="ex-text">' + (isNext ? '<span class="upnext">Up next</span>' : '') +
+    '<span class="name">' + (isBonus ? '<span class="tag">Bonus</span>' : '') + esc(e.name) + '</span>' +
+    '<span class="ex-sub"><b>' + dosage + '</b>' + (e.rest ? '<span>rest ' + restLabel(e.rest) + '</span>' : '') + '</span>' +
+    (done && !open ? '' : '<span class="machine">' + esc(e.machine) + '</span>') + '</span>' +
+    '<span class="chev" aria-hidden="true"></span></button></div>' + tools + more + '</li>';
 }
 
 function simpleCard(action, id, on, name, detail, info) {
   return '<li class="card' + (on ? ' done' : '') + '"><div class="row">' + checkbox(action, id, on, name) +
-    '<div class="body"><div class="name">' + esc(name) + '</div>' + (info ? works(info) : '') + (detail ? '<div class="tip">' + esc(detail) + '</div>' : '') + '</div></div></li>';
+    '<div class="body"><div class="name">' + esc(name) + '</div>' + (detail ? '<div class="tip">' + esc(detail) + '</div>' : '') + '</div></div></li>';
 }
 
 function weekStrip(k) {
@@ -108,7 +114,7 @@ function ring(pct) {
 // Streak and month count under today's title.
 function heroStats() {
   const sk = streak(), m = monthStats(todayKey());
-  return '<div class="hero-stats"><span><b>' + sk + '</b> day streak</span><span><b>' + m.worked + '</b> workout days in ' + esc(m.name) + '</span></div>';
+  return '<div class="hero-stats"><span><b>' + sk + '</b> day streak</span><span><b>' + m.worked + '</b> days in ' + esc(m.name) + '</span></div>';
 }
 
 function hero(k) {
@@ -125,9 +131,9 @@ function hero(k) {
     '<div class="eyebrow">' + DAY_NAMES[dow(k)] + ', ' + fmt(k) + (k === today ? ' &middot; today' : '') + (wk ? ' &middot; week ' + wk : '') + '</div>' +
     '<h1>' + esc(p.focus) + '</h1>' +
     '<div class="hero-sub">' + st.done + ' of ' + st.total + ' done' + (st.sets ? ' &middot; ' + st.sets + ' sets' : '') + '</div>' +
-    (k === today ? heroStats() : '') +
+    (musclesFor(p).length ? '<div class="hero-works">Works ' + musclesFor(p).map(esc).join(', ') + '</div>' : '') +
     '</div>' + ring(st.pct) + '</div>' +
-    (musclesFor(p).length ? '<div class="hero-muscles"><span>Works today</span>' + musclesFor(p).map((m) => '<i>' + esc(m) + '</i>').join('') + '</div>' : '') +
+    (k === today ? heroStats() : '') +
     (sub ? '<div class="hero-next">' + esc(sub) + '</div>' : '') + swap +
     '</section>';
 }
@@ -178,7 +184,7 @@ function renderToday() {
   } else {
     const nx = nextUp(k);
     const nextId = nx && k === today ? nx.id : null;
-    body += '<h2>Workout <span class="h-note">in this order</span></h2><ul class="list">' +
+    body += '<h2>Workout <span class="h-note">top to bottom, tap a name for tips</span></h2><ul class="list">' +
       mainExercises(p).map((e) => exerciseCard(e, d, false, e.id === nextId)).join('') + '</ul>';
     body += '<h2>Bonus <span class="h-note">if your body allows today</span></h2>' +
       '<ul class="list">' + bonusExercises(p).map((e) => exerciseCard(e, d, true, false)).join('') + '</ul>';
@@ -189,7 +195,11 @@ function renderToday() {
   body += '<h2>Daily habits</h2><div class="card stepscard"><div class="steps-top"><label class="name" for="steps-in">Steps today</label>' +
     '<label class="kg big"><input type="number" inputmode="numeric" min="0" max="100000" step="100" id="steps-in" data-steps="1" value="' + esc(steps) + '" placeholder="0"><span>steps</span></label></div>' +
     '<div class="bar"><span id="steps-bar" style="width:' + stepsPct(steps) + '%"></span></div><div class="tip" id="steps-note">' + stepsNote(steps) + '</div></div>';
-  body += '<ul class="list compact">' + HABITS.map((h) => simpleCard('habit', h.id, !!d.habits[h.id], h.name)).join('') + '</ul>';
+  body += '<div class="habits">' + HABITS.filter((h) => h.id !== 'steps').map((h) => {
+    const on = !!d.habits[h.id];
+    return '<button type="button" class="habit' + (on ? ' on' : '') + '" data-action="habit" data-id="' + esc(h.id) + '" role="checkbox" aria-checked="' + on + '">' +
+      '<span class="hb-tick" aria-hidden="true"></span><span>' + esc(h.name) + '</span></button>';
+  }).join('') + '</div>';
 
   const mealsDone = MEALS.filter((m) => d.meals[m.id]).length;
   body += '<details class="diet"' + (S.settings.dietOpen ? ' open' : '') + '><summary data-action="diet-toggle"><span>Diet plan <span class="h-note">optional, veg ghar ka khana</span></span><span class="muted">' + mealsDone + '/' + MEALS.length + '</span></summary>' +
@@ -206,18 +216,21 @@ function renderReport() {
   const r = reportData(ui.reportWs);
   const thisWeek = ui.reportWs === weekStartOf(todayKey());
   const tiles = [
-    ['Workout days', r.trained + '/' + r.trainDays, (thisWeek ? 'this week so far, ' : 'this week, ') + r.fullDays + ' fully done'],
-    ['In ' + r.month.name, r.month.worked, 'of ' + r.month.planned + ' training days so far'],
-    ['Total', r.totalDays, 'workout days ever'],
-    ['Streak', r.streak, 'days in a row, Sundays skipped'],
-    ['Best streak', r.best.days, r.best.days ? fmt(r.best.from) + (r.best.from !== r.best.to ? ' to ' + fmt(r.best.to) : '') : 'starts with your first workout'],
-    ['Workout score', r.score + '%', r.done + ' of ' + r.total + ' items, ' + r.sets + ' sets'],
-    ['Steps a day', num(r.stepsAvg), num(STEP_GOAL) + ' goal hit ' + r.stepsGoal + ' days'],
-    ['Habits', r.habitsPct + '%', 'water, steps, sleep, no junk']
+    ['This week', r.trained + '<small>/' + r.trainDays + '</small>', 'workout days'],
+    ['Streak', r.streak, 'Sundays skipped'],
+    [r.month.name, r.month.worked, 'workout days']
   ].map((t) => '<div class="tile"><div class="tl">' + t[0] + '</div><div class="tv">' + t[1] + '</div><div class="ts">' + t[2] + '</div></div>').join('');
+  const statRows = [
+    ['Best streak', r.best.days ? r.best.days + ' days, ' + fmt(r.best.from) + (r.best.from !== r.best.to ? ' to ' + fmt(r.best.to) : '') : 'Starts with your first workout'],
+    ['Total workout days', num(r.totalDays)],
+    ['Fully finished days', r.fullDays + (thisWeek ? ' this week so far' : ' this week')],
+    ['Workout score', r.score + '%, ' + r.done + ' of ' + r.total + ' items, ' + r.sets + ' sets'],
+    ['Steps a day', r.stepsDays ? num(r.stepsAvg) + ', goal hit ' + r.stepsGoal + ' days' : 'Not logged'],
+    ['Habits', r.habitsPct + '%']
+  ].map((x) => '<div class="stat"><span>' + x[0] + '</span><b>' + esc(x[1]) + '</b></div>').join('');
 
   const rows = r.rows.map((row) => '<tr><td><b>' + DAY_SHORT[dow(row.k)] + '</b> ' + fmt(row.k) + '</td><td>' + esc(row.p.short) + '</td>' +
-    '<td class="num">' + row.st.done + '/' + row.st.total + '</td><td class="num">' + (row.st.steps ? num(row.st.steps) : '-') + '</td>' +
+    '<td class="num">' + row.st.done + '/' + row.st.total + '</td>' +
     '<td><span class="pill ' + row.status + '">' + STATUS_LABEL[row.status] + '</span></td></tr>').join('');
 
   const missed = r.missed.length
@@ -242,21 +255,22 @@ function renderReport() {
     const diff = Math.round((r.body[r.body.length - 1].kg - r.lastBody) * 10) / 10;
     bodyChange = '<p class="' + (diff < 0 ? 'good' : 'muted') + '">' + (diff < 0 ? 'Down ' + Math.abs(diff) : diff > 0 ? 'Up ' + diff : 'No change, 0') + ' kg since the last weigh in.</p>';
   }
-  const saveBtns = '<button type="button" class="primary" data-action="pdf-report">Download PDF</button>' +
-    '<button type="button" class="ghost" data-action="doc-report">Download Word</button>';
 
   return '<div class="weeknav rep"><button type="button" class="arrow" data-action="rweek" data-n="-7" aria-label="Previous week">&#8249;</button>' +
     '<div class="rtitle"><div class="eyebrow">Weekly report</div><h1>' + fmt(r.ws) + ' to ' + fmt(r.we) + '</h1></div>' +
     '<button type="button" class="arrow" data-action="rweek" data-n="7" aria-label="Next week">&#8250;</button></div>' +
     '<p class="verdict">' + esc(r.verdict) + '</p>' +
-    '<div class="saverow">' + saveBtns + '<button type="button" class="ghost" data-action="copy-report">Copy text</button></div>' +
-    '<div class="tiles">' + tiles + '</div>' +
-    '<h2>Day by day</h2><div class="tablewrap"><table><thead><tr><th>Day</th><th>Focus</th><th class="num">Items</th><th class="num">Steps</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<div class="tiles three">' + tiles + '</div>' +
+    '<div class="stats">' + statRows + '</div>' +
+    '<h2>Day by day</h2><div class="tablewrap"><table class="days"><thead><tr><th>Day</th><th>Workout</th><th class="num">Done</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<h2>Missed</h2>' + missed + todo +
     '<h2>Weights</h2>' + weights +
     '<h2>Body weight</h2><div class="weigh"><label class="kg big"><input type="number" inputmode="decimal" min="30" max="250" step="0.1" id="bodykg" value="' + esc(bodyNow) + '" placeholder="111" aria-label="Body weight"><span>kg today</span></label>' +
     '<button type="button" class="primary" data-action="save-body">Save</button></div>' + bodyList + bodyChange +
-    '<div class="actions">' + saveBtns + '</div>';
+    '<h2>Save this report</h2><div class="saverow">' +
+    '<button type="button" class="primary" data-action="pdf-report">PDF</button>' +
+    '<button type="button" class="ghost" data-action="doc-report">Word</button>' +
+    '<button type="button" class="ghost" data-action="copy-report">Copy text</button></div>';
 }
 
 /* ---------- Plan ---------- */
@@ -304,19 +318,21 @@ function workoutList() {
 }
 
 function goalLegend() {
-  return '<h2>What the tags mean</h2><ul class="legend">' + Object.keys(GOALS).map((k) =>
+  return '<details class="fold"><summary>What the tags mean</summary><ul class="legend">' + Object.keys(GOALS).map((k) =>
     '<li><span class="goal g-' + k + '">' + esc(GOALS[k].label) + '</span><span>' + esc(GOALS[k].why) + '</span></li>').join('') + '</ul>' +
-    '<p class="muted small">Losing weight: every lift counts, not just cardio. Lifting keeps your muscle while the diet and steps burn fat, so the weight you lose is fat.</p>';
+    '<p class="muted small">Losing weight: every lift counts, not just cardio. Lifting keeps your muscle while the diet and steps burn fat, so the weight you lose is fat.</p></details>';
 }
 
+// One fold per workout in your week, so the list stays short.
 function watchList() {
-  const seen = {};
+  const sch = schedule();
   return Object.values(WORKOUTS).map((p) => {
-    if (p.rest) return '';
-    const items = p.exercises.filter((e) => { if (seen[e.id] || !e.video) return false; seen[e.id] = 1; return true; });
+    if (p.rest || !sch.includes(p.key)) return '';
+    const items = p.exercises.filter((e) => e.video);
     if (!items.length) return '';
-    return '<h3>' + esc(p.focus) + '</h3><ul class="watchlist">' + items.map((e) =>
-      '<li><a href="' + esc(e.video) + '" target="_blank" rel="noopener">' + esc(e.name) + ' <span aria-hidden="true">&#8599;</span></a><span class="muted">' + esc(e.machine) + '</span></li>').join('') + '</ul>';
+    const days = WEEK_ORDER.filter((i) => sch[i] === p.key).map((i) => DAY_SHORT[i]).join(', ');
+    return '<details class="fold"><summary>' + esc(p.focus) + ' <span class="muted">' + days + ', ' + items.length + ' videos</span></summary><ul class="watchlist">' + items.map((e) =>
+      '<li><a href="' + esc(e.video) + '" target="_blank" rel="noopener">' + esc(e.name) + ' <span aria-hidden="true">&#8599;</span></a><span class="muted">' + esc(e.machine) + '</span></li>').join('') + '</ul></details>';
   }).join('');
 }
 
@@ -342,12 +358,11 @@ function renderPlan() {
   return '<div class="eyebrow">Weekly plan</div><h1>Your split</h1>' +
     '<p class="muted">Each day starts with a fresh checklist. Bonus exercises are there every day, do them when your body allows.</p>' +
     scheduleEditor() +
-    '<h2>Workouts</h2>' + workoutList() + goalLegend() +
-    notifySection() +
-    '<h2>Watch list</h2><p class="muted">How to do each exercise. Opens YouTube.</p>' + watchList() +
+    '<h2>Workouts</h2>' + workoutList() +
+    '<h2>Watch list <span class="h-note">how to do each exercise</span></h2>' + watchList() +
     '<h2>Rules</h2><ul class="plain"><li>Last 1 to 2 reps hard, form clean. Never to failure for now.</li>' +
     '<li>Hit the top reps on every set, then add the smallest weight jump next time.</li>' +
     '<li>Never lock knees on leg press. Keep your back flat on every row and pulldown.</li>' +
-    '<li>Every 6 to 8 weeks, one easy week at half the sets.</li></ul>' +
-    dataSection();
+    '<li>Every 6 to 8 weeks, one easy week at half the sets.</li></ul>' + goalLegend() +
+    notifySection() + dataSection();
 }

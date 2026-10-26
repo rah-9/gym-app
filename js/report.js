@@ -50,7 +50,9 @@ export function reportData(ws) {
   let score = total ? Math.round(done / total * 100) : 0;
   let asOf = addDays(ws, 6) < today ? addDays(ws, 6) : today;
   let verdict;
-  if (!trainDays) verdict = 'The week has not started yet. Monday is ' + planFor(ws).focus + '.';
+  let inProgress = addDays(ws, 6) >= today;
+  if (!trainDays) verdict = inProgress ? 'New week. Today is ' + planFor(today).focus + '.' : 'No workouts logged this week.';
+  else if (inProgress) verdict = 'Week in progress: ' + trained + ' of ' + trainDays + ' training days done so far. Keep going.';
   else if (score >= 90) verdict = 'Strong week. Where you hit the top reps on every set, add a little weight next week.';
   else if (score >= 70) verdict = 'Good week. Close the gaps listed under missed and you are on track.';
   else if (score >= 40) verdict = 'About half done. Pick the days you missed most and block that time next week.';
