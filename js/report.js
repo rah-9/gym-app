@@ -1,6 +1,6 @@
 /* Weekly report: numbers, plain text, Word (.doc) and PDF downloads. */
 import { S } from './store.js';
-import { planFor, dayRead, dayStats, dayStatus, counts, streak, EX_NAMES, STATUS_LABEL, STEP_GOAL } from './plan.js';
+import { planFor, dayRead, dayStats, dayStatus, counts, streak, bestStreak, monthStats, totalWorkoutDays, workedOut, EX_NAMES, STATUS_LABEL, STEP_GOAL } from './plan.js';
 import { esc, fmt, fromKey, addDays, todayKey, weekDays, dow, num, download, toast, DAY_NAMES, DAY_SHORT } from './util.js';
 
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
@@ -21,7 +21,7 @@ export function reportData(ws) {
   let today = todayKey();
   let days = weekDays(ws);
   let total = 0, done = 0, sets = 0, bonus = 0, habitsDone = 0, habitsTotal = 0, mealsDone = 0, mealsTotal = 0;
-  let trained = 0, trainDays = 0, stepsTotal = 0, stepsDays = 0, stepsGoal = 0;
+  let trained = 0, fullDays = 0, trainDays = 0, stepsTotal = 0, stepsDays = 0, stepsGoal = 0;
   let rows = [], missed = [], todo = [];
   days.forEach(function (k) {
     let p = planFor(k), st = dayStats(k), future = k > today;
@@ -32,9 +32,11 @@ export function reportData(ws) {
     mealsDone += st.mealsDone; mealsTotal += st.mealsTotal;
     if (st.steps > 0) { stepsTotal += st.steps; stepsDays++; if (st.steps >= STEP_GOAL) stepsGoal++; }
     if (p.rest) return;
-    trainDays++;
-    total += st.total; done += st.done;
-    if (st.done > 0) trained++;
+    let w = workedOut(k);
+    // Today joins the count once you train, so an unstarted today is not counted as missed.
+    if (k < today || w) { trainDays++; total += st.total; done += st.done; }
+    if (w) trained++;
+    if (st.pct === 100) fullDays++;
     if (st.missed.length) (k === today ? todo : missed).push({ k: k, items: st.missed });
   });
   let thisW = bestWeights(ws), lastW = bestWeights(addDays(ws, -7));
@@ -46,6 +48,7 @@ export function reportData(ws) {
   let prevBody = Object.keys(S.body).filter(function (k) { return k < ws; }).sort();
   let lastBody = prevBody.length ? S.body[prevBody[prevBody.length - 1]] : null;
   let score = total ? Math.round(done / total * 100) : 0;
+  let asOf = addDays(ws, 6) < today ? addDays(ws, 6) : today;
   let verdict;
   if (!trainDays) verdict = 'The week has not started yet. Monday is ' + planFor(ws).focus + '.';
   else if (score >= 90) verdict = 'Strong week. Where you hit the top reps on every set, add a little weight next week.';
@@ -54,12 +57,13 @@ export function reportData(ws) {
   else verdict = 'Rough week. Restart Monday with just the main exercises, no bonus, and build back up.';
   return {
     ws: ws, we: addDays(ws, 6), rows: rows, missed: missed, todo: todo, score: score,
-    total: total, done: done, trained: trained, trainDays: trainDays, sets: sets, bonus: bonus,
+    total: total, done: done, trained: trained, fullDays: fullDays, trainDays: trainDays, sets: sets, bonus: bonus,
+    asOf: asOf, month: monthStats(asOf), best: bestStreak(asOf), totalDays: totalWorkoutDays(),
     habitsPct: habitsTotal ? Math.round(habitsDone / habitsTotal * 100) : 0,
     mealsPct: mealsTotal ? Math.round(mealsDone / mealsTotal * 100) : 0,
     stepsTotal: stepsTotal, stepsDays: stepsDays, stepsGoal: stepsGoal,
     stepsAvg: stepsDays ? Math.round(stepsTotal / stepsDays) : 0,
-    weights: weights, body: body, lastBody: lastBody, verdict: verdict, streak: streak()
+    weights: weights, body: body, lastBody: lastBody, verdict: verdict, streak: streak(asOf)
   };
 }
 
@@ -68,11 +72,14 @@ export function reportText(r) {
   L.push('GYM REPORT: ' + fmt(r.ws) + ' to ' + fmt(r.we));
   L.push('');
   L.push('Workout score: ' + r.score + '% (' + r.done + ' of ' + r.total + ' items)');
-  L.push('Days trained: ' + r.trained + ' of ' + r.trainDays + ' so far');
+  L.push('Workout days this week: ' + r.trained + ' of ' + r.trainDays + ' (' + r.fullDays + ' fully finished)');
+  L.push('Workout days in ' + r.month.name + ': ' + r.month.worked + ' of ' + r.month.planned + ' training days so far');
+  L.push('Total workout days: ' + r.totalDays);
   L.push('Sets ticked: ' + r.sets + ', bonus exercises: ' + r.bonus);
   L.push('Steps: ' + num(r.stepsTotal) + ' total, ' + num(r.stepsAvg) + ' a day on average, ' + num(STEP_GOAL) + ' goal hit on ' + r.stepsGoal + ' days');
   L.push('Habits: ' + r.habitsPct + '%, diet on plan: ' + r.mealsPct + '%');
-  L.push('Current streak: ' + r.streak + ' training days');
+  L.push('Streak: ' + r.streak + ' workout days in a row (Sundays skipped)');
+  L.push('Best streak: ' + bestLabel(r.best));
   L.push('');
   L.push('DAY BY DAY');
   r.rows.forEach(function (row) {
@@ -98,11 +105,19 @@ export function reportText(r) {
 }
 
 
+export function bestLabel(b) {
+  if (!b.days) return '0 days';
+  return b.days + (b.days === 1 ? ' day' : ' days') + ' (' + fmt(b.from) + (b.from !== b.to ? ' to ' + fmt(b.to) : '') + ')';
+}
+
 function summaryRows(r) {
   return [
     ['Workout score', r.score + '% (' + r.done + ' of ' + r.total + ' items)'],
-    ['Days trained', r.trained + ' of ' + r.trainDays],
-    ['Current streak', r.streak + ' full training days'],
+    ['Workout days this week', r.trained + ' of ' + r.trainDays + ' (' + r.fullDays + ' fully finished)'],
+    ['Workout days in ' + r.month.name, r.month.worked + ' of ' + r.month.planned + ' training days so far'],
+    ['Total workout days', String(r.totalDays)],
+    ['Streak', r.streak + ' workout days in a row (Sundays skipped)'],
+    ['Best streak', bestLabel(r.best)],
     ['Sets ticked', r.sets + ' (bonus exercises: ' + r.bonus + ')'],
     ['Steps', num(r.stepsTotal) + ' total, ' + num(r.stepsAvg) + ' a day, ' + num(STEP_GOAL) + ' hit on ' + r.stepsGoal + ' days'],
     ['Habits', r.habitsPct + '%'],

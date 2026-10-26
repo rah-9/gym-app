@@ -1,7 +1,7 @@
 /* Plan logic: which workout a day gets, what counts as done, streaks and last weights. */
 import { WORKOUTS, SCHEDULE, WARMUP, HABITS, MEALS, PROGRAM_START } from './data.js';
 import { S, dayHasProgress } from './store.js';
-import { addDays, todayKey, dow, fromKey } from './util.js';
+import { addDays, todayKey, dow, fromKey, keyOf, MONTH_NAMES } from './util.js';
 
 export const STEP_GOAL = 10000;
 export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday first
@@ -150,20 +150,74 @@ export function dayStatus(k) {
 }
 export const STATUS_LABEL = { done: 'Done', partial: 'Partial', missed: 'Missed', upcoming: 'Upcoming', today: 'Today', rest: 'Rest', pre: 'Before start' };
 
-// Full training days in a row. Rest days don't break it; today only adds once complete.
-export function streak() {
-  const today = todayKey();
-  let k = today, count = 0;
-  for (let i = 0; i < 400; i++) {
-    if (!counts(k) && k !== today) break;
+/* ---------- workout days and streaks ----------
+   A workout day is a training day (not a rest day) where at least one real exercise was done:
+   the exercise ticked, or at least one of its sets ticked. Warm up and cardio alone do not count,
+   and you do not need to finish every exercise for the day to count.
+   Rest days (Sunday) never add to a streak and never break it.
+   Today only adds once you train; an unfinished today never breaks the streak. */
+export function workedOut(k) {
+  const p = planFor(k), d = S.days[k];
+  if (!p || p.rest || !d) return false;
+  return p.exercises.some((e) => !!(d.done && d.done[e.id]) || ((d.sets && d.sets[e.id]) || []).some(Boolean));
+}
+
+function firstWorkoutDay() {
+  return Object.keys(S.days).filter(workedOut).sort()[0] || null;
+}
+
+const cap = (end) => { const today = todayKey(); return !end || end > today ? today : end; };
+
+// Workout days in a row, ending on `end` (default today).
+export function streak(end) {
+  const today = todayKey(), first = firstWorkoutDay();
+  if (!first) return 0;
+  let k = cap(end), count = 0;
+  while (k >= first) {
     if (!planFor(k).rest) {
-      if (dayStats(k).pct === 100) count++;
+      if (workedOut(k)) count++;
       else if (k !== today) break;
     }
     k = addDays(k, -1);
   }
   return count;
 }
+
+// Longest streak up to `end` (default today), with the first and last day of it.
+export function bestStreak(end) {
+  const today = todayKey(), last = cap(end), first = firstWorkoutDay();
+  const best = { days: 0, from: null, to: null };
+  if (!first || first > last) return best;
+  let run = 0, from = null;
+  for (let k = first; k <= last; k = addDays(k, 1)) {
+    if (planFor(k).rest) continue;
+    if (workedOut(k)) {
+      if (!run) from = k;
+      run++;
+      if (run > best.days) { best.days = run; best.from = from; best.to = k; }
+    } else if (k !== today) run = 0;
+  }
+  return best;
+}
+
+// Workout days in the calendar month of `k`, up to today, against training days so far.
+// A training day counts as "so far" once it has passed, or today once you train.
+export function monthStats(k) {
+  const d = fromKey(k), today = todayKey();
+  const start = keyOf(new Date(d.getFullYear(), d.getMonth(), 1));
+  const end = keyOf(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+  let worked = 0, planned = 0;
+  for (let x = start; x <= end && x <= today; x = addDays(x, 1)) {
+    const w = workedOut(x);
+    if (w) worked++;
+    if (planFor(x).rest || (!counts(x) && !w)) continue;
+    if (x < today || w) planned++;
+  }
+  return { worked, planned, name: MONTH_NAMES[d.getMonth()] };
+}
+
+// Every workout day ever logged.
+export const totalWorkoutDays = () => Object.keys(S.days).filter(workedOut).length;
 
 export function programWeek(k) {
   const diff = Math.round((fromKey(k) - fromKey(PROGRAM_START)) / 864e5);

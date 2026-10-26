@@ -28,7 +28,14 @@ Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
 - Steps box each day: type the number from your phone's step counter. Hitting 10,000 ticks the steps habit by itself.
 - Cardio and daily habits (water, steps, sleep, no junk) as tick boxes. Diet plan is an optional fold-out section.
 - Notes for each day.
-- Report tab: weekly report for Monday to Sunday with workout score, days trained, sets, streak, habits, meals,
+- How workout days and streaks are counted:
+  - A workout day is a training day where at least one real exercise is ticked (or one of its sets).
+    Warm up or cardio alone does not count, and you do not have to finish everything.
+  - Streak: workout days in a row. Rest days (Sunday) are skipped, they never add to it or break it.
+    An unfinished today does not break it; it adds once you train.
+  - Best streak: the longest run ever, with its dates. Also shown: workout days this week, this month, and in total.
+  - Today's card shows the current streak and this month's workout days.
+- Report tab: weekly report for Monday to Sunday with workout score, workout days, sets, streak, best streak, month and total, habits, meals,
   day-by-day status with steps, missed exercises, best weights vs last week, body weight, notes.
   Download it as a PDF or a Word (.doc) file, or copy it as text. On Sunday the app reminds you the report is ready.
   The PDF maker (jsPDF) loads from cdnjs only when you tap Download PDF, so the app stays light.

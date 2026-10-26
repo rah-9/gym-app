@@ -3,9 +3,10 @@ import { WORKOUTS, WARMUP, HABITS, MEALS, GOALS } from './data.js';
 import { S } from './store.js';
 import {
   planFor, workoutKeyFor, schedule, dayRead, dayStats, dayStatus, hasProgress, mainExercises, bonusExercises,
-  weightHint, musclesFor, nextUp, programWeek, counts, stepsPct, STEP_GOAL, STATUS_LABEL, WEEK_ORDER
+  weightHint, musclesFor, nextUp, programWeek, counts, stepsPct, STEP_GOAL, STATUS_LABEL, WEEK_ORDER,
+  streak, monthStats
 } from './plan.js';
-import { reportData } from './report.js';
+import { reportData, bestLabel } from './report.js';
 import * as notify from './notify.js';
 import { $, esc, fmt, keyOf, fromKey, addDays, todayKey, weekStartOf, weekDays, dow, num, restLabel, clockTime, DAY_NAMES, DAY_SHORT } from './util.js';
 
@@ -104,6 +105,12 @@ function ring(pct) {
     '<text x="32" y="37" text-anchor="middle">' + pct + '%</text></svg>';
 }
 
+// Streak and month count under today's title.
+function heroStats() {
+  const sk = streak(), m = monthStats(todayKey());
+  return '<div class="hero-stats"><span><b>' + sk + '</b> day streak</span><span><b>' + m.worked + '</b> workout days in ' + esc(m.name) + '</span></div>';
+}
+
 function hero(k) {
   const p = planFor(k), st = dayStats(k), today = todayKey(), wk = programWeek(k);
   const nx = nextUp(k);
@@ -118,6 +125,7 @@ function hero(k) {
     '<div class="eyebrow">' + DAY_NAMES[dow(k)] + ', ' + fmt(k) + (k === today ? ' &middot; today' : '') + (wk ? ' &middot; week ' + wk : '') + '</div>' +
     '<h1>' + esc(p.focus) + '</h1>' +
     '<div class="hero-sub">' + st.done + ' of ' + st.total + ' done' + (st.sets ? ' &middot; ' + st.sets + ' sets' : '') + '</div>' +
+    (k === today ? heroStats() : '') +
     '</div>' + ring(st.pct) + '</div>' +
     (musclesFor(p).length ? '<div class="hero-muscles"><span>Works today</span>' + musclesFor(p).map((m) => '<i>' + esc(m) + '</i>').join('') + '</div>' : '') +
     (sub ? '<div class="hero-next">' + esc(sub) + '</div>' : '') + swap +
@@ -198,10 +206,12 @@ function renderReport() {
   const r = reportData(ui.reportWs);
   const thisWeek = ui.reportWs === weekStartOf(todayKey());
   const tiles = [
-    ['Workout score', r.score + '%', r.done + ' of ' + r.total + ' items'],
-    ['Days trained', r.trained + '/' + r.trainDays, thisWeek ? 'so far this week' : 'training days'],
-    ['Streak', r.streak, 'full training days in a row'],
-    ['Sets ticked', r.sets, r.bonus + ' bonus exercises'],
+    ['Workout days', r.trained + '/' + r.trainDays, (thisWeek ? 'this week so far, ' : 'this week, ') + r.fullDays + ' fully done'],
+    ['In ' + r.month.name, r.month.worked, 'of ' + r.month.planned + ' training days so far'],
+    ['Total', r.totalDays, 'workout days ever'],
+    ['Streak', r.streak, 'days in a row, Sundays skipped'],
+    ['Best streak', r.best.days, r.best.days ? fmt(r.best.from) + (r.best.from !== r.best.to ? ' to ' + fmt(r.best.to) : '') : 'starts with your first workout'],
+    ['Workout score', r.score + '%', r.done + ' of ' + r.total + ' items, ' + r.sets + ' sets'],
     ['Steps a day', num(r.stepsAvg), num(STEP_GOAL) + ' goal hit ' + r.stepsGoal + ' days'],
     ['Habits', r.habitsPct + '%', 'water, steps, sleep, no junk']
   ].map((t) => '<div class="tile"><div class="tl">' + t[0] + '</div><div class="tv">' + t[1] + '</div><div class="ts">' + t[2] + '</div></div>').join('');
