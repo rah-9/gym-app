@@ -843,3 +843,57 @@ button.cal-cell:active { transform: scale(0.94); }
 .body-in .kg { padding: 0 10px; }
 .body-in .kg input { width: 66px; }
 .note-row .note-status { flex: 0 1 auto; }
+
+/* ---------- Weight chart v2 (no yellow) ---------- */
+.wc-grid { stroke: rgba(255, 255, 255, 0.06); stroke-width: 1; }
+.wc-line { fill: none; stroke: url(#wcLine); stroke-width: 3; stroke-linecap: round; }
+.wc-dot { fill: #121215; stroke: #b9a8ff; stroke-width: 1.5; }
+.wc-halo { fill: rgba(255, 255, 255, 0.12); }
+.wc-last { fill: #ffffff; }
+.wc-target { stroke: rgba(201, 188, 255, 0.7); stroke-width: 1.2; stroke-dasharray: 5 5; }
+.wc-goalbg { fill: rgba(185, 168, 255, 0.18); }
+.wc-goal { fill: #d9d0ff; font-size: 9.5px; font-weight: 600; font-family: var(--font); }
+.wc-tagbg { fill: #f5f5f7; }
+.wc-tag { fill: #0a0a0c; font-size: 10.5px; font-weight: 700; font-family: var(--font); }
+.wc-ax { fill: var(--muted); font-size: 9.5px; font-family: var(--font); }
+
+/* ---------- Junk food log ---------- */
+.treatcard { margin-top: 10px; gap: 10px; }
+.pen { margin-left: 6px; font-size: 12px; font-weight: 700; color: #f6a9bf; background: var(--miss-soft); padding: 2px 8px; border-radius: 999px; vertical-align: 1px; }
+.treats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.treats li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: var(--surface-2); font-size: 14px; }
+.treats li span { flex: 1; min-width: 0; }
+.treats li small { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.treats .x { width: 26px; height: 26px; border-radius: 50%; border: 0; background: var(--surface-3); color: var(--muted); font-size: 16px; line-height: 1; padding: 0; }
+.treat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.treat { position: relative; display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 12px 12px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); }
+.treat b { font-size: 14px; font-weight: 600; padding-right: 44px; line-height: 1.25; }
+.treat small { font-size: 11.5px; color: var(--muted); }
+.treat .tp { position: absolute; top: 10px; right: 10px; font-size: 11px; font-weight: 700; color: #f6a9bf; }
+.treat:active { transform: scale(0.98); }
+
+/* ---------- Balance plan ---------- */
+.balance { margin-top: 16px; gap: 8px; background: linear-gradient(135deg, rgba(185, 168, 255, 0.10), rgba(255, 255, 255, 0.02)), var(--surface); border-color: rgba(185, 168, 255, 0.28); }
+.bal-head { display: flex; justify-content: space-between; align-items: center; }
+.bal-tag { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.bal-n { font-size: 13px; font-weight: 700; color: var(--ink); background: var(--surface-3); padding: 2px 10px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.bal-from { margin: 0; font-size: 13px; color: var(--muted); }
+.bal-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.bal-list li { display: flex; align-items: center; gap: 10px; }
+.bal-list li > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bal-list b { font-size: 14.5px; font-weight: 600; }
+.bal-list small { font-size: 12px; color: var(--muted); }
+.bal-list .bt { flex: none; width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--faint); }
+.bal-list li.done .bt { background: #f5f5f7; box-shadow: 0 0 8px rgba(255, 255, 255, 0.4); }
+.bal-list li.done b { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(255, 255, 255, 0.35); }
+.bal-list .tick { width: 26px; height: 26px; }
+
+/* ---------- Report: junk food summary ---------- */
+.treatsum { gap: 10px; }
+.pen-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.pen-tiles div { display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; border-radius: 12px; background: var(--surface-2); text-align: center; }
+.pen-tiles span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.pen-tiles b { font-size: 20px; font-weight: 600; }
+.pen-tiles .owe { background: var(--miss-soft); }
+.pen-tiles .owe b { color: #f6a9bf; }
+.pen-tiles .ok b { color: #ffffff; }

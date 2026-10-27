@@ -308,3 +308,93 @@ export function programWeek(k) {
 }
 
 export function stepsPct(v) { return Math.min(100, Math.round((parseInt(v, 10) || 0) / STEP_GOAL * 100)); }
+
+/* ---------- treats, penalty points and the balance plan ----------
+   Logging junk food costs penalty points (1 point per 250 kcal rounded, min 1, max 8 for one item).
+   Instead of burning the food off, which research links to more overeating and weight cycling,
+   the next 1 to 3 days get a small, capped balance plan: a few extra steps, a little extra
+   easy cardio, and junk-free days. Never skip meals. Finishing the balance plan earns the
+   points back. Calories are rough averages for Indian portions. */
+export const TREATS = [
+  { id: 'pizza-whole', name: 'Pizza, whole medium', kcal: 1800 },
+  { id: 'pizza-half', name: 'Pizza, half', kcal: 900 },
+  { id: 'pizza-slice', name: 'Pizza, 1 slice', kcal: 250 },
+  { id: 'burger', name: 'Burger', kcal: 500 },
+  { id: 'fries', name: 'French fries, medium', kcal: 350 },
+  { id: 'samosa', name: 'Samosa, 1', kcal: 260 },
+  { id: 'pakora', name: 'Pakora / bhajji plate', kcal: 400 },
+  { id: 'chips', name: 'Chips or namkeen pack', kcal: 270 },
+  { id: 'mithai', name: 'Sweets / mithai, 2 pieces', kcal: 300 },
+  { id: 'cake', name: 'Cake or pastry slice', kcal: 350 },
+  { id: 'icecream', name: 'Ice cream cup', kcal: 250 },
+  { id: 'chocolate', name: 'Chocolate bar', kcal: 230 },
+  { id: 'colddrink', name: 'Cold drink, 500 ml', kcal: 210 },
+  { id: 'sugar-tea', name: 'Extra sugary tea or coffee', kcal: 120 }
+];
+const TREAT_BY_ID = Object.fromEntries(TREATS.map((t) => [t.id, t]));
+export const treatInfo = (id) => TREAT_BY_ID[id] || { id, name: id, kcal: 0 };
+export const treatPoints = (kcal) => Math.max(1, Math.min(8, Math.round(kcal / 250)));
+export const ptsLabel = (n) => n + (n === 1 ? ' pt' : ' pts');
+export const walkMinutes = (kcal) => Math.round(kcal / 5); // brisk walk at about 110 kg: roughly 5 kcal a minute
+
+// What one treat asks of the following days.
+function treatPlan(kcal) {
+  const p = treatPoints(kcal);
+  if (p <= 1) return { days: 1, steps: 1500, cardio: 0, noJunk: 1 };
+  if (p <= 3) return { days: 2, steps: 2000, cardio: 0, noJunk: 1 };
+  return { days: 3, steps: 2500, cardio: 10, noJunk: 3 };
+}
+export const treatsOn = (k) => ((S.days[k] || {}).treats || []);
+
+// Today's balance plan from treats in the last 3 days. Capped so it never becomes punishment.
+export function balanceFor(k) {
+  let steps = 0, cardio = 0, noJunk = false;
+  const from = [];
+  for (let i = 1; i <= 3; i++) {
+    const kk = addDays(k, -i);
+    treatsOn(kk).forEach((t) => {
+      const pl = treatPlan(t.kcal);
+      if (i > pl.days) return;
+      steps += pl.steps; if (i <= 2) cardio += pl.cardio; if (i <= pl.noJunk) noJunk = true;
+      from.push({ k: kk, name: treatInfo(t.id).name });
+    });
+  }
+  steps = Math.min(steps, 3000); cardio = Math.min(cardio, 20);
+  if (!steps && !cardio && !noJunk) return null;
+  return { steps, cardio, noJunk, from };
+}
+
+// Balance tasks done on day k: extra steps, extra cardio, junk-free.
+export function balanceDone(k) {
+  const b = balanceFor(k);
+  if (!b) return null;
+  const d = S.days[k] || {}, tasks = [];
+  if (b.steps) tasks.push({ id: 'steps', done: (parseInt(d.steps, 10) || 0) >= STEP_GOAL + b.steps });
+  if (b.cardio) tasks.push({ id: 'cardio', done: !!d.balanceCardio });
+  if (b.noJunk) tasks.push({ id: 'nojunk', done: !!(d.habits || {}).nojunk && !treatsOn(k).length });
+  return { tasks, done: tasks.filter((t) => t.done).length, total: tasks.length };
+}
+
+// Points for treats eaten in a week, and how many were earned back by the balance days after them.
+export function penaltyWeek(ws) {
+  const today = todayKey();
+  let points = 0, back = 0, kcal = 0;
+  const items = [];
+  for (let i = 0; i < 7; i++) {
+    const k = addDays(ws, i);
+    treatsOn(k).forEach((t) => {
+      const p = treatPoints(t.kcal), pl = treatPlan(t.kcal);
+      let ratio = 0, n = 0;
+      for (let j = 1; j <= pl.days; j++) {
+        const kk = addDays(k, j);
+        if (kk > today) continue;
+        const bd = balanceDone(kk);
+        if (bd && bd.total) { ratio += bd.done / bd.total; n++; }
+      }
+      const earned = Math.round(p * (n ? ratio / pl.days : 0));
+      points += p; back += earned; kcal += t.kcal;
+      items.push({ k, name: treatInfo(t.id).name, kcal: t.kcal, points: p, earned });
+    });
+  }
+  return { items, points, back, net: points - back, kcal };
+}

@@ -1,6 +1,6 @@
 /* Weekly report: numbers, plain text, Word (.doc) and PDF downloads. */
 import { S } from './store.js';
-import { planFor, dayRead, dayStats, dayStatus, counts, streak, bestStreak, monthStats, totalWorkoutDays, workedOut, EX_NAMES, STATUS_LABEL, STEP_GOAL, bodyStats, sessionMinutes } from './plan.js';
+import { planFor, dayRead, dayStats, dayStatus, counts, streak, bestStreak, monthStats, totalWorkoutDays, workedOut, EX_NAMES, STATUS_LABEL, STEP_GOAL, bodyStats, sessionMinutes, penaltyWeek } from './plan.js';
 import { esc, fmt, fromKey, addDays, todayKey, weekDays, dow, num, download, toast, DAY_NAMES, DAY_SHORT } from './util.js';
 
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
@@ -60,7 +60,7 @@ export function reportData(ws) {
   return {
     ws: ws, we: addDays(ws, 6), rows: rows, missed: missed, todo: todo, score: score,
     total: total, done: done, trained: trained, fullDays: fullDays, trainDays: trainDays, sets: sets, bonus: bonus,
-    asOf: asOf, month: monthStats(asOf), best: bestStreak(asOf), totalDays: totalWorkoutDays(), bodyStats: bodyStats(asOf),
+    asOf: asOf, month: monthStats(asOf), best: bestStreak(asOf), totalDays: totalWorkoutDays(), bodyStats: bodyStats(asOf), penalty: penaltyWeek(ws),
     habitsPct: habitsTotal ? Math.round(habitsDone / habitsTotal * 100) : 0,
     mealsPct: mealsTotal ? Math.round(mealsDone / mealsTotal * 100) : 0,
     stepsTotal: stepsTotal, stepsDays: stepsDays, stepsGoal: stepsGoal,
@@ -227,6 +227,12 @@ export function docReport(r) {
     const ch = weightChange(w), col = w.last == null ? PC.muted : w.now > w.last ? PC.up : w.now < w.last ? PC.down : PC.muted;
     return '<tr' + (i % 2 ? ' style="background:#fafafc"' : '') + '><td>' + esc(w.name) + '</td><td><b>' + w.now + ' kg</b></td><td>' + (w.last != null ? w.last + ' kg' : '-') + '</td><td style="color:' + col + ';font-weight:bold">' + ch + '</td></tr>';
   }).join('') + '</table>' : '<p style="color:' + PC.muted + '">No weights logged this week.</p>');
+  // junk food
+  h += h2('Junk food') + (r.penalty.items.length
+    ? '<table><tr>' + [['Penalty', r.penalty.points + ' pts'], ['Earned back', r.penalty.back + ' pts'], ['Still owed', r.penalty.net + ' pts'], ['Extra kcal', num(r.penalty.kcal)]].map((x, i) =>
+        td('<div style="font-size:8.5pt;color:' + PC.muted + '">' + x[0] + '</div><div style="font-size:15pt;font-weight:bold;color:' + (i === 2 && r.penalty.net > 0 ? PC.down : PC.ink) + '">' + x[1] + '</div>', 'background:' + (i === 2 && r.penalty.net > 0 ? PC.missed : PC.tile) + ';padding:8pt;width:25%;border:1px solid #ffffff')).join('') + '</tr></table>' +
+      '<table class="t"><tr><th>Day</th><th>Food</th><th>kcal</th><th>Points</th><th>Earned back</th></tr>' + r.penalty.items.map((t) => '<tr><td>' + DAY_SHORT[dow(t.k)] + ' ' + fmt(t.k) + '</td><td>' + esc(t.name) + '</td><td>' + num(t.kcal) + '</td><td>' + t.points + '</td><td>' + t.earned + '</td></tr>').join('') + '</table>'
+    : '<p style="color:' + PC.muted + '">Clean week. No junk food logged.</p>');
   // missed
   h += h2('Missed') + (r.missed.length ? r.missed.map((m) => '<p style="margin:3pt 0"><span style="background:' + PC.missed + ';color:' + PC.down + ';font-weight:bold;padding:1pt 6pt">' + DAY_SHORT[dow(m.k)] + '</span> ' + esc(m.items.join(', ')) + '</p>').join('') : '<p style="color:' + PC.muted + '">Nothing missed. Clean week.</p>');
   const notes = notesOf(r);
@@ -326,9 +332,9 @@ export function pdfReport(r) {
         doc.setFillColor('#fbfbfd'); doc.roundedRect(M, y, CW, ch, 8, 8, 'F');
         font(7.5, 'normal', PC.muted); doc.text(k1(hi - 1), M + 6, Y(hi - 1) + 3); doc.text(k1(lo + 1), M + 6, Y(lo + 1) + 3);
         if (b.target != null) {
-          doc.setDrawColor(PC.gold); doc.setLineDashPattern([3, 3], 0); doc.setLineWidth(1);
+          doc.setDrawColor('#b3a8f0'); doc.setLineDashPattern([3, 3], 0); doc.setLineWidth(1);
           doc.line(M + 34, Y(b.target), W - M - 10, Y(b.target)); doc.setLineDashPattern([], 0);
-          font(7.5, 'bold', PC.gold); doc.text('target ' + k1(b.target), W - M - 10, Y(b.target) - 4, { align: 'right' });
+          font(7.5, 'bold', PC.accent); doc.text('goal ' + k1(b.target), W - M - 10, Y(b.target) - 4, { align: 'right' });
         }
         doc.setDrawColor(PC.accent); doc.setLineWidth(2);
         for (let i = 1; i < pts.length; i++) doc.line(X(i - 1), Y(pts[i - 1].kg), X(i), Y(pts[i].kg));
@@ -358,6 +364,26 @@ export function pdfReport(r) {
       r.weights.forEach((w, i) => row([w.name, w.now + ' kg', w.last != null ? w.last + ' kg' : '-', weightChange(w)],
         { fill: i % 2 ? '#fafafc' : null, chColor: w.last == null ? PC.muted : w.now > w.last ? PC.up : w.now < w.last ? PC.down : PC.muted }));
     } else { font(9.5, 'normal', PC.muted); doc.text('No weights logged this week.', M, y + 4); y += 12; }
+
+    // Junk food
+    heading('Junk food');
+    const pen = r.penalty;
+    if (pen.items.length) {
+      const pw = (CW - 3 * 8) / 4;
+      [['Penalty', pen.points + ' pts'], ['Earned back', pen.back + ' pts'], ['Still owed', pen.net + ' pts'], ['Extra kcal', num(pen.kcal)]].forEach((x, i) => {
+        const owe = i === 2 && pen.net > 0;
+        doc.setFillColor(owe ? PC.missed : PC.tile); doc.roundedRect(M + i * (pw + 8), y, pw, 46, 7, 7, 'F');
+        font(7.5, 'bold', PC.muted); doc.text(x[0].toUpperCase(), M + i * (pw + 8) + 10, y + 16);
+        font(14, 'bold', owe ? PC.down : PC.ink); doc.text(x[1], M + i * (pw + 8) + 10, y + 36);
+      });
+      y += 56;
+      pen.items.forEach((t) => {
+        need(18); font(9.5, 'normal', PC.ink);
+        doc.text(DAY_SHORT[dow(t.k)] + ' ' + fmt(t.k) + '   ' + t.name, M, y + 10);
+        font(9, 'normal', PC.muted); doc.text(num(t.kcal) + ' kcal, ' + t.points + ' pts, ' + t.earned + ' back', W - M, y + 10, { align: 'right' });
+        y += 16;
+      });
+    } else { font(9.5, 'normal', PC.muted); doc.text('Clean week. No junk food logged.', M, y + 4); y += 12; }
 
     // Missed
     heading('Missed');

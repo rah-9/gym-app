@@ -1,8 +1,8 @@
 /* App start-up and all tap/typing handlers. */
 import { S, save, backupNow, checkBackupSchedule, autoRestore, restoreLatest, importBackup, exportBackup, wipeAll, requestPersistentStorage } from './store.js';
-import { planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct, streak, monthStats, bestKg, sessionMinutes, EX_NAMES, WATER_GOAL, noteTarget } from './plan.js';
+import { planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct, streak, monthStats, bestKg, sessionMinutes, EX_NAMES, WATER_GOAL, noteTarget, treatInfo, treatPoints, ptsLabel, balanceFor } from './plan.js';
 import { reportData, reportText, docReport, pdfReport } from './report.js';
-import { ui, render, stepsNote, daySheetHtml, noteStatus, sessionLabel } from './views.js';
+import { ui, render, stepsNote, daySheetHtml, noteStatus, sessionLabel, treatSheetHtml } from './views.js';
 import { startRest, addRest, setRestEnd, stopRest } from './timer.js';
 import { initLock, isUnlocked, showLock, lockNow, recordActivity } from './lock.js';
 import * as notify from './notify.js';
@@ -123,6 +123,25 @@ function openSheet(k) {
   });
 }
 
+function openTreatSheet() {
+  const el = document.createElement('div');
+  el.className = 'sheet';
+  el.innerHTML = treatSheetHtml();
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  const close = () => { el.classList.remove('show'); setTimeout(() => el.remove(), 250); };
+  el.addEventListener('click', (ev) => {
+    if (ev.target === el || ev.target.closest('[data-sheet]')) return close();
+    const b = ev.target.closest('[data-treat]');
+    if (!b) return;
+    const info = treatInfo(b.dataset.treat), d = dayWrite(ui.selDate);
+    d.treats = (d.treats || []).concat([{ id: info.id, kcal: info.kcal, at: Date.now() }]);
+    d.habits.nojunk = false;
+    save(); close(); render();
+    toast(info.name + ' logged, ' + ptsLabel(treatPoints(info.kcal)) + '. A small balance plan starts tomorrow.');
+  });
+}
+
 // Keep the session time on the hero ticking while the app is open.
 setInterval(() => {
   const s = $('#sess');
@@ -186,6 +205,12 @@ let wipeArmed = false;
 const ACTIONS = {
   done: (el) => toggleDone(el.dataset.id),
   'cal-day': (el) => openSheet(el.dataset.k),
+  'treat-open': () => openTreatSheet(),
+  'treat-del': (el) => {
+    const d = dayWrite(ui.selDate);
+    (d.treats || []).splice(+el.dataset.i, 1); save(); render(); toast('Removed.');
+  },
+  'balance-cardio': () => { const d = dayWrite(ui.selDate); d.balanceCardio = !d.balanceCardio; save(); render(); if (d.balanceCardio) toast('Extra cardio done. Points coming back.'); },
   expand: (el) => { const id = el.dataset.id; ui.open[id] = el.getAttribute('aria-expanded') !== 'true'; render(); },
   set: (el) => toggleSet(el.dataset.id, +el.dataset.i),
   habit: (el) => { const d = dayWrite(ui.selDate); d.habits[el.dataset.id] = !d.habits[el.dataset.id]; save(); render(); },
@@ -358,7 +383,7 @@ function nudge(tag, title, body) {
 }
 function remindTick() {
   const r = S.settings.remind || {}, now = new Date(), h = now.getHours(), t = Date.now();
-  if (h < 7 || h >= 22) return;
+  if (h < 7 || h >= 22) return; // quiet from 10 PM to 7 AM, sleep time
   const d = S.days[todayKey()] || {};
   if (S.settings.lastWaterRemind == null) { S.settings.lastWaterRemind = t; S.settings.lastStepsRemind = t; save(); return; }
   const wInt = r.water == null ? 30 : r.water;

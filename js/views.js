@@ -4,7 +4,7 @@ import { S } from './store.js';
 import {
   planFor, workoutKeyFor, schedule, dayRead, dayStats, dayStatus, hasProgress, mainExercises, bonusExercises,
   weightHint, musclesFor, nextUp, programWeek, counts, stepsPct, STEP_GOAL, STATUS_LABEL, WEEK_ORDER,
-  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, WATER_GOAL
+  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek
 } from './plan.js';
 import { reportData, bestLabel } from './report.js';
 import * as notify from './notify.js';
@@ -257,6 +257,7 @@ function renderToday() {
     notesForDay(k).forEach((ln) => {
       body += '<div class="memo"><span class="memo-h">Note from ' + DAY_SHORT[dow(ln.k)] + ' ' + fmt(ln.k) + ' (' + esc(planFor(ln.k).short) + ')</span><p>' + esc(ln.note) + '</p></div>';
     });
+    body += balanceCard(k);
     body += '<h2>Workout <span class="h-note">top to bottom, tap a name for tips</span></h2><ul class="list">' +
       mainExercises(p).map((e) => exerciseCard(e, d, false, e.id === nextId)).join('') + '</ul>';
     body += '<h2>Bonus <span class="h-note">if your body allows today</span></h2>' +
@@ -276,6 +277,7 @@ function renderToday() {
     '<div class="glasses">' + Array.from({ length: WATER_GOAL }, (_, i) => '<i class="' + (i < water ? 'on' : '') + '"></i>').join('') + '</div>' +
     '<div class="tip">' + (water >= WATER_GOAL ? 'Goal hit, 3 litres. Nice.' : (WATER_GOAL - water) + ' glasses of 250 ml to go.') + '</div></div>';
   if (k === today) body += bodyCard();
+  body += treatCard(k);
   body += '<div class="habits">' + HABITS.filter((h) => h.id !== 'steps' && h.id !== 'water').map((h) => {
     const on = !!d.habits[h.id];
     return '<button type="button" class="habit' + (on ? ' on' : '') + '" data-action="habit" data-id="' + esc(h.id) + '" role="checkbox" aria-checked="' + on + '">' +
@@ -312,7 +314,8 @@ function renderReport() {
     ['Fully finished days', r.fullDays + (thisWeek ? ' this week so far' : ' this week')],
     ['Workout score', r.score + '%, ' + r.done + ' of ' + r.total + ' items, ' + r.sets + ' sets'],
     ['Steps a day', r.stepsDays ? num(r.stepsAvg) + ', goal hit ' + r.stepsGoal + ' days' : 'Not logged'],
-    ['Habits', r.habitsPct + '%']
+    ['Habits', r.habitsPct + '%'],
+    ['Junk food penalty', r.penalty.points ? r.penalty.points + ' pts, ' + r.penalty.back + ' earned back' : 'Clean week, 0 pts']
   ].map((x) => '<div class="stat"><span>' + x[0] + '</span><b>' + esc(x[1]) + '</b></div>').join('');
 
   const rows = r.rows.map((row) => '<tr><td><b>' + DAY_SHORT[dow(row.k)] + '</b> ' + fmt(row.k) + '</td><td>' + esc(row.p.short) + '</td>' +
@@ -351,7 +354,7 @@ function renderReport() {
     '<h2>Day by day</h2><div class="tablewrap"><table class="days"><thead><tr><th>Day</th><th>Workout</th><th class="num">Done</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<h2>Missed</h2>' + missed + todo +
     '<h2>Weights</h2>' + weights +
-    bodySection() +
+    bodySection() + junkSection(r.penalty) +
     '<h2>Save this report</h2><div class="saverow">' +
     '<button type="button" class="primary" data-action="pdf-report">PDF</button>' +
     '<button type="button" class="ghost" data-action="doc-report">Word</button>' +
@@ -429,24 +432,39 @@ function bodyCard() {
     '<div class="tip">' + line + '</div></div>';
 }
 
-// Line chart of weigh-ins with the target as a dashed line.
+// Smooth weight trend: soft gradient line and fill, light grid, goal as a dashed line, latest value tagged.
 function weightChart(b) {
   const pts = b.entries.slice(-16);
   if (pts.length < 2) return '<p class="muted small">The chart appears after your second weigh-in.</p>';
-  const W = 320, H = 130, P = 26;
+  const W = 330, H = 160, L = 34, R = 12, T = 14, B = 26;
   const vals = pts.map((p) => p.kg).concat(b.target != null ? [b.target] : []);
-  let lo = Math.min.apply(null, vals) - 1, hi = Math.max.apply(null, vals) + 1;
-  const x = (i) => P + i * (W - P - 8) / (pts.length - 1), y = (v) => 8 + (hi - v) / (hi - lo) * (H - 28);
-  const line = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.kg).toFixed(1)).join(' ');
-  const area = line + ' L' + x(pts.length - 1).toFixed(1) + ' ' + (H - 20) + ' L' + x(0).toFixed(1) + ' ' + (H - 20) + ' Z';
-  const tgt = b.target != null ? '<line x1="' + P + '" x2="' + (W - 8) + '" y1="' + y(b.target).toFixed(1) + '" y2="' + y(b.target).toFixed(1) + '" class="wc-target"/>' +
-    '<text x="' + (W - 8) + '" y="' + (y(b.target) - 4).toFixed(1) + '" text-anchor="end" class="wc-tl">target ' + kg1(b.target) + '</text>' : '';
-  const dots = pts.map((p, i) => '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.kg).toFixed(1) + '" r="' + (i === pts.length - 1 ? 4 : 2.5) + '" class="wc-dot' + (i === pts.length - 1 ? ' last' : '') + '"/>').join('');
+  const lo = Math.floor(Math.min.apply(null, vals) - 1), hi = Math.ceil(Math.max.apply(null, vals) + 1);
+  const x = (i) => L + i * (W - L - R) / (pts.length - 1), y = (v) => T + (hi - v) / (hi - lo) * (H - T - B);
+  const P = pts.map((p, i) => [x(i), y(p.kg)]);
+  // Catmull-Rom to Bezier for a smooth curve
+  let d = 'M' + P[0][0].toFixed(1) + ' ' + P[0][1].toFixed(1);
+  for (let i = 0; i < P.length - 1; i++) {
+    const p0 = P[i - 1] || P[i], p1 = P[i], p2 = P[i + 1], p3 = P[i + 2] || p2;
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ' C' + c1[0].toFixed(1) + ' ' + c1[1].toFixed(1) + ' ' + c2[0].toFixed(1) + ' ' + c2[1].toFixed(1) + ' ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1);
+  }
+  const area = d + ' L' + P[P.length - 1][0].toFixed(1) + ' ' + (H - B) + ' L' + P[0][0].toFixed(1) + ' ' + (H - B) + ' Z';
+  const steps = 4, grid = Array.from({ length: steps + 1 }, (_, i) => lo + (hi - lo) * i / steps).map((v) =>
+    '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '" class="wc-grid"/>' +
+    '<text x="' + (L - 6) + '" y="' + (y(v) + 3.5).toFixed(1) + '" text-anchor="end" class="wc-ax">' + Math.round(v) + '</text>').join('');
+  const goal = b.target != null ? '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(b.target).toFixed(1) + '" y2="' + y(b.target).toFixed(1) + '" class="wc-target"/>' +
+    '<rect x="' + (W - R - 58) + '" y="' + (y(b.target) - 18).toFixed(1) + '" width="58" height="15" rx="7.5" class="wc-goalbg"/>' +
+    '<text x="' + (W - R - 29) + '" y="' + (y(b.target) - 7.5).toFixed(1) + '" text-anchor="middle" class="wc-goal">Goal ' + kg1(b.target) + '</text>' : '';
+  const lp = P[P.length - 1], tagX = Math.min(Math.max(lp[0], L + 24), W - R - 24);
+  const dots = P.map((p, i) => i === P.length - 1 ? '' : '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="2.4" class="wc-dot"/>').join('');
   return '<svg class="wchart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Weight trend">' +
-    '<defs><linearGradient id="wcFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9a8ff" stop-opacity="0.35"/><stop offset="1" stop-color="#b9a8ff" stop-opacity="0"/></linearGradient></defs>' +
-    '<text x="2" y="' + (y(hi - 1) + 4).toFixed(1) + '" class="wc-ax">' + kg1(hi - 1) + '</text><text x="2" y="' + (y(lo + 1) + 4).toFixed(1) + '" class="wc-ax">' + kg1(lo + 1) + '</text>' +
-    tgt + '<path d="' + area + '" fill="url(#wcFill)"/><path d="' + line + '" class="wc-line"/>' + dots +
-    '<text x="' + P + '" y="' + (H - 4) + '" class="wc-ax">' + fmt(pts[0].k) + '</text><text x="' + (W - 8) + '" y="' + (H - 4) + '" text-anchor="end" class="wc-ax">' + fmt(pts[pts.length - 1].k) + '</text></svg>';
+    '<defs><linearGradient id="wcFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9bcff" stop-opacity="0.42"/><stop offset="1" stop-color="#c9bcff" stop-opacity="0"/></linearGradient>' +
+    '<linearGradient id="wcLine" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8f7cf5"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs>' +
+    grid + goal + '<path d="' + area + '" fill="url(#wcFill)"/><path d="' + d + '" class="wc-line"/>' + dots +
+    '<circle cx="' + lp[0].toFixed(1) + '" cy="' + lp[1].toFixed(1) + '" r="9" class="wc-halo"/><circle cx="' + lp[0].toFixed(1) + '" cy="' + lp[1].toFixed(1) + '" r="4.5" class="wc-last"/>' +
+    '<rect x="' + (tagX - 24) + '" y="' + (lp[1] - 30).toFixed(1) + '" width="48" height="18" rx="9" class="wc-tagbg"/>' +
+    '<text x="' + tagX + '" y="' + (lp[1] - 17.5).toFixed(1) + '" text-anchor="middle" class="wc-tag">' + kg1(pts[pts.length - 1].kg) + '</text>' +
+    '<text x="' + L + '" y="' + (H - 8) + '" class="wc-ax">' + fmt(pts[0].k) + '</text><text x="' + (W - R) + '" y="' + (H - 8) + '" text-anchor="end" class="wc-ax">' + fmt(pts[pts.length - 1].k) + '</text></svg>';
 }
 
 // Full body weight section for the Report tab.
@@ -470,6 +488,52 @@ export function bodySection() {
     '<button type="button" class="primary" data-action="save-body">Save</button></div>' +
     '<div class="bw-form"><label class="kg big"><input type="number" inputmode="decimal" min="30" max="250" step="0.5" id="targetkg" value="' + esc(S.settings.targetKg || '') + '" placeholder="95" aria-label="Target weight"><span>kg target</span></label>' +
     '<button type="button" class="ghost" data-action="save-target">Set target</button></div></div>';
+}
+
+/* ---------- junk food and balance plan ---------- */
+function treatCard(k) {
+  const list = treatsOn(k);
+  const pts = list.reduce((a, t) => a + treatPoints(t.kcal), 0);
+  return '<div class="card treatcard"><div class="steps-top"><span class="name">Junk food' + (list.length ? ' <span class="pen">&minus;' + pts + ' pts</span>' : '') + '</span>' +
+    '<button type="button" class="chip" data-action="treat-open">' + (list.length ? 'Log more' : 'Log junk food') + '</button></div>' +
+    (list.length ? '<ul class="treats">' + list.map((t, i) => '<li><span>' + esc(treatInfo(t.id).name) + '</span><small>' + num(t.kcal) + ' kcal, ' + ptsLabel(treatPoints(t.kcal)) + '</small>' +
+      '<button type="button" class="x" data-action="treat-del" data-i="' + i + '" aria-label="Remove">&times;</button></li>').join('') + '</ul>' +
+      '<div class="tip">A balance plan starts tomorrow. Finish it to earn the points back. Eat your next meal as normal, do not skip meals.</div>'
+      : '<div class="tip">Clean so far today. If you eat something, log it honestly. No guilt, just a small plan to balance it.</div>') + '</div>';
+}
+
+function balanceCard(k) {
+  const b = balanceFor(k), bd = balanceDone(k);
+  if (!b || !bd) return '';
+  const d = dayRead(k), steps = parseInt(d.steps, 10) || 0;
+  const src = Array.from(new Set(b.from.map((f) => f.name))).join(', ');
+  const row = (done, title, sub, btn) => '<li class="' + (done ? 'done' : '') + '"><span class="bt" aria-hidden="true"></span><div><b>' + title + '</b><small>' + sub + '</small></div>' + (btn || '') + '</li>';
+  let rows = '';
+  if (b.steps) rows += row(bd.tasks.find((t) => t.id === 'steps').done, 'Walk ' + num(b.steps) + ' extra steps', 'Goal today ' + num(STEP_GOAL + b.steps) + ', now ' + num(steps) + '. Fills in from your steps box.');
+  if (b.cardio) rows += row(!!d.balanceCardio, 'Extra ' + b.cardio + ' min easy cardio', 'Incline walk or cycle after your workout, easy pace.',
+    '<button type="button" class="tick' + (d.balanceCardio ? ' on' : '') + '" data-action="balance-cardio" role="checkbox" aria-checked="' + !!d.balanceCardio + '" aria-label="Extra cardio done"></button>');
+  if (b.noJunk) rows += row(bd.tasks.find((t) => t.id === 'nojunk').done, 'No junk today', 'Tick "No sugar, cold drinks or fried snacks" in habits.');
+  return '<div class="balance card"><div class="bal-head"><span class="bal-tag">Balance plan</span><span class="bal-n">' + bd.done + '/' + bd.total + '</span></div>' +
+    '<p class="bal-from">For: ' + esc(src) + '. Small and capped, finish it to earn your points back.</p><ul class="bal-list">' + rows + '</ul></div>';
+}
+
+function junkSection(pen) {
+  if (!pen.items.length) return '<h2>Junk food</h2><div class="card treatsum"><b>Clean week.</b><span class="muted small">No junk food logged, no penalty points.</span></div>';
+  return '<h2>Junk food</h2><div class="card treatsum"><div class="pen-tiles">' +
+    '<div><span>Penalty</span><b>' + pen.points + '</b></div><div><span>Earned back</span><b>' + pen.back + '</b></div>' +
+    '<div class="' + (pen.net > 0 ? 'owe' : 'ok') + '"><span>Still owed</span><b>' + pen.net + '</b></div></div>' +
+    '<ul class="treats">' + pen.items.map((t) => '<li><span>' + DAY_SHORT[dow(t.k)] + ' &middot; ' + esc(t.name) + '</span><small>' + num(t.kcal) + ' kcal, ' + t.points + ' pts, ' + t.earned + ' back</small></li>').join('') + '</ul>' +
+    '<p class="muted small">About ' + num(pen.kcal) + ' extra kcal this week, close to ' + Math.round(walkMinutes(pen.kcal) / 60 * 10) / 10 + ' hours of brisk walking. Points come back by finishing the balance plan on the days after.</p></div>';
+}
+
+// Sheet with the junk food list. Shows the calorie cost as walking minutes before you log it.
+export function treatSheetHtml() {
+  return '<div class="sheet-card" role="dialog" aria-label="Log junk food"><div class="sheet-grab" aria-hidden="true"></div>' +
+    '<div class="sheet-head"><div><div class="eyebrow">Log junk food</div><h2>What did you have?</h2></div></div>' +
+    '<p class="muted small" style="margin:6px 0 12px">Calories are rough averages. Walking time is what it takes to burn it, just so you know the cost.</p>' +
+    '<div class="treat-grid">' + TREATS.map((t) => '<button type="button" class="treat" data-treat="' + t.id + '"><b>' + esc(t.name) + '</b>' +
+      '<small>' + num(t.kcal) + ' kcal &middot; ' + walkMinutes(t.kcal) + ' min walk</small><span class="tp">&minus;' + treatPoints(t.kcal) + ' pts</span></button>').join('') + '</div>' +
+    '<div class="sheet-actions"><button type="button" class="ghost" data-sheet="close">Cancel</button></div></div>';
 }
 
 /* ---------- Plan ---------- */
