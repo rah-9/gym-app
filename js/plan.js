@@ -173,7 +173,40 @@ export function bodyStats(upTo) {
   const rate = days >= 6 ? Math.round((from.kg - current) / days * 7 * 10) / 10 : null; // kg lost per week
   let eta = null;
   if (toGo != null && toGo > 0 && rate && rate > 0) eta = addDays(last.k, Math.round(toGo / rate * 7));
-  return { entries, target, start, current, last: last.k, lost, toGo, pct, rate, eta };
+  return { entries, target, start, current, last: last.k, lost, toGo, pct, rate, eta, deadline: deadlinePlan(current, toGo, rate) };
+}
+
+/* Target date: how fast you need to lose to hit it, and whether that is safe.
+   Safe ceiling = 1% of body weight a week, never above 1 kg (common medical guidance is 0.5 to 1 kg a week).
+   1 kg of body fat is about 7,700 kcal. */
+function deadlinePlan(current, toGo, rate) {
+  const date = S.settings.targetDate;
+  if (!date || toGo == null || toGo <= 0) return null;
+  const today = todayKey();
+  const safeMax = Math.min(1, Math.round(current * 0.01 * 10) / 10);
+  const safeDate = addDays(today, Math.ceil(toGo / safeMax * 7));
+  if (date <= today) return { date, overdue: true, safeMax, safeDate };
+  const days = Math.round((fromKey(date) - fromKey(today)) / 864e5);
+  const weeks = days / 7;
+  const need = Math.round(toGo / weeks * 100) / 100;
+  const realistic = Math.round((current - safeMax * weeks) * 10) / 10;
+  const kcal = Math.round(Math.min(need, safeMax) * 7700 / 7 / 50) * 50; // daily deficit to aim for, capped at the safe pace
+  const status = need > safeMax * 1.1 ? 'unsafe' : rate != null && rate >= need * 0.9 ? 'on' : rate != null ? 'behind' : 'unknown';
+  return { date, days, weeks, need, safeMax, safeDate, realistic, kcal, status };
+}
+
+// One plain sentence about the target date, used in the app and in every report.
+export function deadlineText(b) {
+  const dl = b && b.deadline;
+  if (!dl) return null;
+  const r1 = (v) => (Math.round(v * 10) / 10).toFixed(1);
+  const D = (k) => { const d = fromKey(k); return d.getDate() + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()] + ' ' + d.getFullYear(); };
+  if (dl.overdue) return { status: 'unsafe', head: 'Target date ' + D(dl.date) + ' has passed', body: 'At a safe ' + r1(dl.safeMax) + ' kg a week you can reach ' + r1(b.target) + ' kg around ' + D(dl.safeDate) + '. Set a new date.' };
+  const head = r1(b.toGo) + ' kg by ' + D(dl.date) + ' = ' + r1(dl.need) + ' kg a week';
+  if (dl.status === 'unsafe') return { status: 'unsafe', head, body: 'That is faster than the safe ' + r1(dl.safeMax) + ' kg a week and would mostly cost muscle. By ' + D(dl.date) + ' a realistic weight is ' + r1(dl.realistic) + ' kg. At the safe pace, ' + r1(b.target) + ' kg comes around ' + D(dl.safeDate) + '.' };
+  if (dl.status === 'on') return { status: 'on', head, body: 'You are on track at ' + r1(b.rate) + ' kg a week. Keep a deficit of about ' + dl.kcal + ' kcal a day.' };
+  if (dl.status === 'behind') return { status: 'behind', head, body: 'You are losing ' + r1(b.rate) + ' kg a week, a bit behind. Aim for a deficit of about ' + dl.kcal + ' kcal a day: more steps, no junk, protein every meal.' };
+  return { status: 'unknown', head, body: 'Doable and safe. Aim for a deficit of about ' + dl.kcal + ' kcal a day. Weigh in weekly to check your pace.' };
 }
 
 export const WATER_GOAL = 12; // glasses of 250 ml = 3 litres

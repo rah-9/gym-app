@@ -1,6 +1,6 @@
 /* Weekly report: numbers, plain text, Word (.doc) and PDF downloads. */
 import { S } from './store.js';
-import { planFor, dayRead, dayStats, dayStatus, counts, streak, bestStreak, monthStats, totalWorkoutDays, workedOut, EX_NAMES, STATUS_LABEL, STEP_GOAL, bodyStats, sessionMinutes, penaltyWeek } from './plan.js';
+import { planFor, dayRead, dayStats, dayStatus, counts, streak, bestStreak, monthStats, totalWorkoutDays, workedOut, EX_NAMES, STATUS_LABEL, STEP_GOAL, bodyStats, deadlineText, sessionMinutes, penaltyWeek } from './plan.js';
 import { esc, fmt, fromKey, addDays, todayKey, weekDays, dow, num, download, toast, DAY_NAMES, DAY_SHORT } from './util.js';
 
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
@@ -98,6 +98,8 @@ export function reportText(r) {
       L.push('- ' + w.name + ': ' + w.now + ' kg' + (w.last != null ? ' (last ' + w.last + ' kg)' : ''));
     });
   }
+  const dtx = deadlineText(r.bodyStats);
+  if (dtx) { L.push(''); L.push('GOAL: ' + dtx.head); L.push(dtx.body); }
   if (r.body.length) {
     L.push(''); L.push('BODY WEIGHT');
     r.body.forEach(function (b) { L.push('- ' + fmt(b.k) + ': ' + b.kg + ' kg'); });
@@ -179,6 +181,7 @@ function bodySummary(b) {
     rows: [['Start', k1(b.start) + ' kg'], ['Now', k1(b.current) + ' kg'], ['Target', b.target != null ? k1(b.target) + ' kg' : 'not set'],
       [b.lost >= 0 ? 'Lost' : 'Gained', k1(Math.abs(b.lost)) + ' kg']],
     pct: b.pct,
+    deadline: deadlineText(b),
     line: b.target != null && b.toGo > 0
       ? k1(b.toGo) + ' kg to go' + (b.rate > 0 ? ', losing ' + k1(b.rate) + ' kg a week' + (b.eta ? ', goal around ' + fmt(b.eta) + ' ' + fromKey(b.eta).getFullYear() : '') : '') + '.'
       : b.target != null ? 'Target reached.' : 'Set a target weight in the app to see progress.'
@@ -221,6 +224,10 @@ export function docReport(r) {
     if (bs.pct != null) h += '<table style="margin-top:6pt"><tr>' + td('', 'background:' + PC.accent + ';height:8pt;width:' + Math.max(1, bs.pct) + '%') + td('', 'background:' + PC.line + ';height:8pt') + '</tr></table>' +
       '<p style="color:' + PC.muted + ';font-size:9.5pt;margin:4pt 0">' + bs.pct + '% of the way. ' + esc(bs.line) + '</p>';
     else h += '<p style="color:' + PC.muted + '">' + esc(bs.line) + '</p>';
+    if (bs.deadline) {
+      const dc = bs.deadline.status === 'unsafe' ? [PC.missed, PC.down] : bs.deadline.status === 'behind' ? [PC.partial, PC.partialBorder] : [PC.accentSoft, PC.accent];
+      h += '<table style="margin-top:6pt"><tr>' + td('<div style="font-weight:bold;font-size:11pt;color:' + dc[1] + '">' + esc(bs.deadline.head) + '</div><div style="font-size:10pt;margin-top:2pt">' + esc(bs.deadline.body) + '</div>', 'background:' + dc[0] + ';padding:8pt 10pt;border-left:4px solid ' + dc[1]) + '</tr></table>';
+    }
   }
   // weights
   h += h2('Lifting weights') + (r.weights.length ? '<table class="t"><tr><th>Exercise</th><th>This week</th><th>Last week</th><th>Change</th></tr>' + r.weights.map((w, i) => {
@@ -322,6 +329,16 @@ export function pdfReport(r) {
         y += 18;
       }
       font(9.5, 'normal', PC.muted); doc.text(doc.splitTextToSize((bs.pct != null ? bs.pct + '% of the way. ' : '') + bs.line, CW), M, y + 4); y += 14;
+      if (bs.deadline) {
+        const dc = bs.deadline.status === 'unsafe' ? [PC.missed, PC.down] : bs.deadline.status === 'behind' ? [PC.partial, PC.partialBorder] : [PC.accentSoft, PC.accent];
+        const lines = doc.splitTextToSize(bs.deadline.body, CW - 24);
+        const hh = 24 + lines.length * 12;
+        need(hh + 6); y += 4;
+        doc.setFillColor(dc[0]); doc.roundedRect(M, y, CW, hh, 6, 6, 'F'); doc.setFillColor(dc[1]); doc.rect(M, y, 3.5, hh, 'F');
+        font(10, 'bold', dc[1]); doc.text(bs.deadline.head, M + 12, y + 15);
+        font(9, 'normal', PC.ink); lines.forEach((l, i) => doc.text(l, M + 12, y + 28 + i * 12));
+        y += hh + 4;
+      }
       // trend chart
       const pts = b.entries.slice(-16);
       if (pts.length >= 2) {

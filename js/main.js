@@ -230,8 +230,16 @@ const ACTIONS = {
   'save-target': () => {
     const v = parseFloat($('#targetkg').value);
     if (isNaN(v) || v < 30 || v > 250) { toast('Enter a target in kg, like 95.'); return; }
-    S.settings.targetKg = Math.round(v * 10) / 10; save(); render(); toast('Target set to ' + S.settings.targetKg + ' kg.');
+    S.settings.targetKg = Math.round(v * 10) / 10;
+    const dv = ($('#targetdate') || {}).value;
+    if (dv) {
+      if (dv <= todayKey()) { toast('Pick a target date in the future.'); return; }
+      S.settings.targetDate = dv;
+    }
+    save(); render();
+    toast('Goal set: ' + S.settings.targetKg + ' kg' + (S.settings.targetDate ? ' by ' + fmt(S.settings.targetDate) : '') + '.');
   },
+  'clear-date': () => { delete S.settings.targetDate; save(); render(); toast('Target date removed.'); },
   water: (el) => {
     const d = dayWrite(ui.selDate);
     d.water = Math.max(0, Math.min(20, (d.water || 0) + (+el.dataset.n)));

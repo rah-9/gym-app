@@ -4,7 +4,7 @@ import { S } from './store.js';
 import {
   planFor, workoutKeyFor, schedule, dayRead, dayStats, dayStatus, hasProgress, mainExercises, bonusExercises,
   weightHint, musclesFor, nextUp, programWeek, counts, stepsPct, STEP_GOAL, STATUS_LABEL, WEEK_ORDER,
-  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek
+  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, deadlineText, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek
 } from './plan.js';
 import { reportData, bestLabel } from './report.js';
 import * as notify from './notify.js';
@@ -423,7 +423,7 @@ function bodyCard() {
   const b = bodyStats(), logged = S.body[todayKey()];
   const line = b.current == null ? 'Log your weight to start tracking.'
     : b.target == null ? 'Now ' + kg1(b.current) + ' kg. Set a target in the Report tab.'
-    : b.toGo > 0 ? kg1(b.toGo) + ' kg to your goal of ' + kg1(b.target) + ' kg' + (b.lost > 0 ? ', ' + kg1(b.lost) + ' kg down so far' : '') + '.'
+    : b.toGo > 0 ? (deadlineText(b) ? deadlineText(b).head + (deadlineText(b).status === 'unsafe' ? ', faster than safe. See Report.' : '.') : kg1(b.toGo) + ' kg to your goal of ' + kg1(b.target) + ' kg' + (b.lost > 0 ? ', ' + kg1(b.lost) + ' kg down so far' : '') + '.')
     : 'Goal of ' + kg1(b.target) + ' kg reached. Set a new one.';
   return '<div class="card bodycard"><div class="steps-top"><span class="name">Body weight</span>' +
     '<span class="body-in"><label class="kg"><input type="number" inputmode="decimal" min="30" max="250" step="0.1" id="bodykg" value="' + esc(logged || '') + '" placeholder="' + (b.current ? kg1(b.current) : '0') + '" aria-label="Weight today"><span>kg</span></label>' +
@@ -481,13 +481,17 @@ export function bodySection() {
       (b.rate > 0 ? ', losing ' + kg1(b.rate) + ' kg a week' + (b.eta ? '. At this pace you reach ' + kg1(b.target) + ' kg around ' + fmt(b.eta) + ' ' + fromKey(b.eta).getFullYear() : '') + '.' : '. Weigh in once a week to see your pace and goal date.') + '</p>' +
       '<p class="muted small">A safe pace is 0.5 to 1 kg a week. Faster usually means losing muscle.</p>';
   }
+  const dt = deadlineText(b);
+  const dbox = dt ? '<div class="deadline ' + dt.status + '"><b>' + esc(dt.head) + '</b><p>' + esc(dt.body) + '</p></div>' : '';
   return '<h2>Body weight</h2><div class="card bwcard">' + tiles +
     (b.pct != null ? '<div class="bw-prog"><div class="bar"><span style="width:' + b.pct + '%"></span></div><span>' + b.pct + '% of the way</span></div>' : '') +
-    (b.entries.length ? weightChart(b) : '') + pace +
+    (b.entries.length ? weightChart(b) : '') + dbox + pace +
     '<div class="bw-form"><label class="kg big"><input type="number" inputmode="decimal" min="30" max="250" step="0.1" id="bodykg" value="' + esc(logged || '') + '" placeholder="' + (b.current ? kg1(b.current) : '111') + '" aria-label="Weight today"><span>kg today</span></label>' +
     '<button type="button" class="primary" data-action="save-body">Save</button></div>' +
-    '<div class="bw-form"><label class="kg big"><input type="number" inputmode="decimal" min="30" max="250" step="0.5" id="targetkg" value="' + esc(S.settings.targetKg || '') + '" placeholder="95" aria-label="Target weight"><span>kg target</span></label>' +
-    '<button type="button" class="ghost" data-action="save-target">Set target</button></div></div>';
+    '<div class="goal-form"><span class="gf-l">Goal</span><label class="kg big"><input type="number" inputmode="decimal" min="30" max="250" step="0.5" id="targetkg" value="' + esc(S.settings.targetKg || '') + '" placeholder="95" aria-label="Target weight"><span>kg</span></label>' +
+    '<span class="gf-l">by</span><label class="datein"><input type="date" id="targetdate" min="' + addDays(todayKey(), 7) + '" value="' + esc(S.settings.targetDate || '') + '" aria-label="Target date"></label>' +
+    '<button type="button" class="ghost" data-action="save-target">Set goal</button></div>' +
+    (S.settings.targetDate ? '<button type="button" class="linkbtn" data-action="clear-date">Remove target date</button>' : '') + '</div>';
 }
 
 /* ---------- junk food and balance plan ---------- */

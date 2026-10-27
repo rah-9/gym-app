@@ -897,3 +897,21 @@ button.cal-cell:active { transform: scale(0.94); }
 .pen-tiles .owe { background: var(--miss-soft); }
 .pen-tiles .owe b { color: #f6a9bf; }
 .pen-tiles .ok b { color: #ffffff; }
+
+/* ---------- Goal date ---------- */
+.goal-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.gf-l { font-size: 13px; color: var(--muted); }
+.goal-form .kg.big input { width: 56px; }
+.datein { display: inline-flex; align-items: center; height: 46px; padding: 0 12px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
+.datein input { background: transparent; border: 0; color: var(--ink); font: inherit; font-size: 15px; color-scheme: dark; }
+.datein input:focus { outline: none; }
+.datein:focus-within { border-color: var(--accent); }
+.linkbtn { align-self: flex-start; border: 0; background: transparent; color: var(--muted); font-size: 12.5px; text-decoration: underline; padding: 0; }
+.deadline { padding: 12px 14px; border-radius: 14px; border-left: 3px solid var(--accent); background: rgba(185, 168, 255, 0.10); }
+.deadline b { display: block; font-size: 15px; }
+.deadline p { margin: 4px 0 0; font-size: 13.5px; color: var(--ink-2); line-height: 1.45; }
+.deadline.unsafe { border-left-color: var(--miss); background: var(--miss-soft); }
+.deadline.unsafe b { color: #f6a9bf; }
+.deadline.behind { border-left-color: var(--warn); background: var(--warn-soft); }
+.deadline.behind b { color: #f8d38c; }
+.deadline.on b, .deadline.unknown b { color: #e4dcff; }
