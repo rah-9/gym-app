@@ -4,7 +4,7 @@ import { S } from './store.js';
 import {
   planFor, workoutKeyFor, schedule, dayRead, dayStats, dayStatus, hasProgress, mainExercises, bonusExercises,
   weightHint, musclesFor, nextUp, programWeek, counts, stepsPct, STEP_GOAL, STATUS_LABEL, WEEK_ORDER,
-  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, deadlineText, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek
+  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, deadlineText, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek, stepGoalFor, treatDays, badges, kgHistory
 } from './plan.js';
 import { reportData, bestLabel } from './report.js';
 import * as notify from './notify.js';
@@ -55,11 +55,12 @@ export function render() {
   });
 }
 
-export function stepsNote(v) {
-  const n = parseInt(v, 10) || 0;
-  if (!n) return 'Goal ' + num(STEP_GOAL) + ' a day. Copy the number from your phone\'s step counter.';
-  if (n >= STEP_GOAL) return 'Goal hit. ' + num(n) + ' steps.';
-  return num(STEP_GOAL - n) + ' more to reach ' + num(STEP_GOAL) + '.';
+export function stepsNote(v, goal) {
+  const n = parseInt(v, 10) || 0, g = goal || STEP_GOAL, extra = g - STEP_GOAL;
+  const why = extra > 0 ? ' Today: ' + num(STEP_GOAL) + ' + ' + num(extra) + ' balance steps.' : '';
+  if (!n) return 'Goal ' + num(g) + '.' + (why || ' Copy the number from your phone\'s step counter.');
+  if (n >= g) return 'Goal hit. ' + num(n) + ' steps.' + (extra > 0 ? ' Balance steps done.' : '');
+  return num(g - n) + ' more to reach ' + num(g) + '.' + why;
 }
 
 const workoutOptions = (selected) => Object.values(WORKOUTS)
@@ -114,7 +115,7 @@ function exerciseCard(e, d, isBonus, isNext) {
   const tools = (!done || open) && (dots || kgField || watch)
     ? '<div class="tools">' + (dots ? '<div class="dots">' + dots + '</div>' : '') + kgField + lastNote + watch + '</div>' : '';
   const more = open
-    ? '<div class="more">' + (e.tip ? '<p class="tip">' + esc(e.tip) + '</p>' : '') + works(e) +
+    ? '<div class="more">' + (e.tip ? '<p class="tip">' + esc(e.tip) + '</p>' : '') + works(e) + kgSpark(e.id) +
       (e.rest ? '<button type="button" class="chip" data-action="rest" data-sec="' + e.rest + '" data-name="' + esc(e.name) + '">Start rest timer, ' + restLabel(e.rest) + '</button>' : '') + '</div>'
     : '';
   return '<li class="card ex' + (done ? ' done' : '') + (isBonus ? ' bonus' : '') + (isNext ? ' next' : '') + (open ? ' open' : '') + (ui.justDone === e.id ? ' just-done' : '') + '">' +
@@ -203,7 +204,7 @@ function hero(k) {
     (musclesFor(p).length ? '<div class="hero-works">Works ' + musclesFor(p).map(esc).join(', ') + '</div>' : '') +
     '</div>' + ring(st.pct) + '</div>' +
     (k === today ? heroStats() : '') + (p.rest ? '' : weekBar(k)) +
-    (sub ? '<div class="hero-next">' + esc(sub) + (!complete && readyToLift(k) ? '<span class="hero-lift">' + readyToLift(k) + ' lifts ready to go heavier today</span>' : '') + '</div>' : '') + swap +
+    (sub ? '<div class="hero-next">' + esc(sub) + (!complete && readyToLift(k) ? '<span class="hero-lift">' + readyToLift(k) + (readyToLift(k) === 1 ? ' lift' : ' lifts') + ' ready to go heavier today</span>' : '') + '</div>' : '') + swap +
     (k === today ? '<div class="hero-quote">' + esc(dailyLine(k)) + '</div>' : '') +
     '</section>';
 }
@@ -237,6 +238,8 @@ function reminderHtml() {
       msgs.push((st.total - st.done) + ' items left today. Finish them in the evening if your mood allows.');
     }
   }
+  const yb = balanceDone(y);
+  if (yb && !yb.complete) msgs.push('Yesterday\'s balance plan was not completed (' + yb.done + ' of ' + yb.total + '). Those junk food points are still owed.');
   const isSunday = dow(today) === 0;
   if (isSunday) msgs.push('Your weekly report is ready. Download it as PDF or Word from the Report tab.');
   if (!msgs.length) return '';
@@ -268,7 +271,7 @@ function renderToday() {
   const steps = d.steps || '';
   body += '<h2>Daily habits</h2><div class="card stepscard"><div class="steps-top"><label class="name" for="steps-in">Steps today</label>' +
     '<label class="kg big"><input type="number" inputmode="numeric" min="0" max="100000" step="100" id="steps-in" data-steps="1" value="' + esc(steps) + '" placeholder="0"><span>steps</span></label></div>' +
-    '<div class="bar"><span id="steps-bar" style="width:' + stepsPct(steps) + '%"></span></div><div class="tip" id="steps-note">' + stepsNote(steps) + '</div></div>';
+    '<div class="bar"><span id="steps-bar" style="width:' + stepsPct(steps, stepGoalFor(k)) + '%"></span></div><div class="tip" id="steps-note">' + stepsNote(steps, stepGoalFor(k)) + '</div></div>';
   const water = d.water || 0;
   body += '<div class="card watercard"><div class="steps-top"><span class="name">Water</span>' +
     '<span class="water-ctl"><button type="button" class="wbtn" data-action="water" data-n="-1" aria-label="One glass less">&#8722;</button>' +
@@ -354,7 +357,7 @@ function renderReport() {
     '<h2>Day by day</h2><div class="tablewrap"><table class="days"><thead><tr><th>Day</th><th>Workout</th><th class="num">Done</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<h2>Missed</h2>' + missed + todo +
     '<h2>Weights</h2>' + weights +
-    bodySection() + junkSection(r.penalty) +
+    bodySection() + junkSection(r.penalty) + badgeSection() +
     '<h2>Save this report</h2><div class="saverow">' +
     '<button type="button" class="primary" data-action="pdf-report">PDF</button>' +
     '<button type="button" class="ghost" data-action="doc-report">Word</button>' +
@@ -409,6 +412,8 @@ export function daySheetHtml(k) {
     (doneList.length ? '<h3>Done</h3><ul class="sheet-list ok">' + doneList.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
     (missList.length && k <= todayKey() ? '<h3>' + (k === todayKey() ? 'Still to do' : 'Missed') + '</h3><ul class="sheet-list no">' + missList.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
     (kgRows ? '<h3>Weights</h3><ul class="sheet-kg">' + kgRows + '</ul>' : '') +
+    (treatsOn(k).length ? '<h3>Junk food</h3><ul class="sheet-list no">' + treatsOn(k).map((t) => '<li>' + esc(treatInfo(t.id).name) + ', ' + num(t.kcal) + ' kcal</li>').join('') + '</ul>' : '') +
+    (balanceDone(k) ? '<h3>Balance plan</h3><p class="sheet-note">' + (balanceDone(k).complete ? 'Completed. Points earned back.' : (k < todayKey() ? 'Not completed: ' : 'In progress: ') + balanceDone(k).done + ' of ' + balanceDone(k).total + ' done.') + '</p>' : '') +
     ((d.note || '').trim() ? '<h3>Note</h3><p class="sheet-note">' + esc(d.note) + '</p>' : '') +
     (!doneList.length && !kgRows && !(d.note || '').trim() && k <= todayKey() ? '<p class="muted">Nothing logged on this day.</p>' : '') +
     '<div class="sheet-actions"><button type="button" class="primary" data-sheet="open" data-k="' + k + '">' + (k === todayKey() ? 'Go to today' : 'Open this day') + '</button>' +
@@ -502,23 +507,46 @@ function treatCard(k) {
     '<button type="button" class="chip" data-action="treat-open">' + (list.length ? 'Log more' : 'Log junk food') + '</button></div>' +
     (list.length ? '<ul class="treats">' + list.map((t, i) => '<li><span>' + esc(treatInfo(t.id).name) + '</span><small>' + num(t.kcal) + ' kcal, ' + ptsLabel(treatPoints(t.kcal)) + '</small>' +
       '<button type="button" class="x" data-action="treat-del" data-i="' + i + '" aria-label="Remove">&times;</button></li>').join('') + '</ul>' +
-      '<div class="tip">A balance plan starts tomorrow. Finish it to earn the points back. Eat your next meal as normal, do not skip meals.</div>'
+      '<div class="tip">Before 6 PM the balance plan is added to today, after 6 PM to tomorrow. Finish it to earn the points back. Eat your next meal as normal, do not skip meals.</div>'
       : '<div class="tip">Clean so far today. If you eat something, log it honestly. No guilt, just a small plan to balance it.</div>') + '</div>';
 }
 
 function balanceCard(k) {
   const b = balanceFor(k), bd = balanceDone(k);
   if (!b || !bd) return '';
-  const d = dayRead(k), steps = parseInt(d.steps, 10) || 0;
-  const src = Array.from(new Set(b.from.map((f) => f.name))).join(', ');
+  const d = dayRead(k), steps = parseInt(d.steps, 10) || 0, ticks = d.balanceDone || {}, today = todayKey();
+  const why = b.from.map((f) => esc(f.name) + ' (' + num(f.kcal) + ' kcal, ' + ptsLabel(f.points) + ')' +
+    (f.k === k ? ', eaten before 6 PM today' : ', ' + DAY_SHORT[dow(f.k)] + (f.late ? ' after 6 PM' : '')) + (f.days > 1 ? ', spread over 2 days' : '')).join('; ');
   const row = (done, title, sub, btn) => '<li class="' + (done ? 'done' : '') + '"><span class="bt" aria-hidden="true"></span><div><b>' + title + '</b><small>' + sub + '</small></div>' + (btn || '') + '</li>';
   let rows = '';
-  if (b.steps) rows += row(bd.tasks.find((t) => t.id === 'steps').done, 'Walk ' + num(b.steps) + ' extra steps', 'Goal today ' + num(STEP_GOAL + b.steps) + ', now ' + num(steps) + '. Fills in from your steps box.');
-  if (b.cardio) rows += row(!!d.balanceCardio, 'Extra ' + b.cardio + ' min easy cardio', 'Incline walk or cycle after your workout, easy pace.',
-    '<button type="button" class="tick' + (d.balanceCardio ? ' on' : '') + '" data-action="balance-cardio" role="checkbox" aria-checked="' + !!d.balanceCardio + '" aria-label="Extra cardio done"></button>');
+  b.tasks.forEach((t) => {
+    const done = bd.tasks.find((x) => x.id === t.id).done;
+    if (t.kind === 'steps') rows += row(done, 'Walk ' + num(t.steps) + ' extra steps', 'Step goal today is ' + num(stepGoalFor(k)) + ', you have ' + num(steps) + '. Ticks itself from the steps box. About ' + t.kcal + ' kcal.');
+    else rows += row(done, t.act.name + ', ' + t.minutes + ' min', esc(t.act.how) + ' About ' + t.kcal + ' kcal.',
+      '<button type="button" class="tick' + (ticks[t.id] ? ' on' : '') + '" data-action="balance-tick" data-id="' + t.id + '" role="checkbox" aria-checked="' + !!ticks[t.id] + '" aria-label="' + esc(t.act.name) + ' done"></button>');
+  });
   if (b.noJunk) rows += row(bd.tasks.find((t) => t.id === 'nojunk').done, 'No junk today', 'Tick "No sugar, cold drinks or fried snacks" in habits.');
-  return '<div class="balance card"><div class="bal-head"><span class="bal-tag">Balance plan</span><span class="bal-n">' + bd.done + '/' + bd.total + '</span></div>' +
-    '<p class="bal-from">For: ' + esc(src) + '. Small and capped, finish it to earn your points back.</p><ul class="bal-list">' + rows + '</ul></div>';
+  const state = bd.complete ? '<p class="bal-ok">Balance done. Points earned back.</p>' : k < today ? '<p class="bal-miss">Not completed. These points stay owed.</p>' : '';
+  return '<div class="balance card' + (bd.complete ? ' complete' : '') + '"><div class="bal-head"><span class="bal-tag">Balance plan</span><span class="bal-n">' + bd.done + '/' + bd.total + '</span></div>' +
+    '<p class="bal-from"><b>Why:</b> ' + why + '. Burn back about ' + b.kcal + ' kcal today, roughly 30% of it. Activities change every day.</p>' +
+    '<ul class="bal-list">' + rows + '</ul>' + state + '</div>';
+}
+
+// Small bar chart of the last weights for one exercise.
+function kgSpark(id) {
+  const h = kgHistory(id, ui.selDate, 6);
+  if (h.length < 2) return '';
+  const max = Math.max.apply(null, h.map((x) => x.kg)), min = Math.min.apply(null, h.map((x) => x.kg));
+  return '<div class="kgspark"><span class="ks-l">Last ' + h.length + ' sessions</span><div class="ks-bars">' + h.map((x, i) => {
+    const pct = max === min ? 70 : 30 + (x.kg - min) / (max - min) * 70;
+    return '<span class="' + (i === h.length - 1 ? 'last' : '') + '"><i style="height:' + pct.toFixed(0) + '%"></i><em>' + x.kg + '</em></span>';
+  }).join('') + '</div></div>';
+}
+
+function badgeSection() {
+  const list = badges(), got = list.filter((b) => b.on).length;
+  return '<h2>Badges <span class="h-note">' + got + ' of ' + list.length + ' earned</span></h2><div class="badges">' + list.map((b) =>
+    '<div class="badge' + (b.on ? ' on' : '') + '"><span class="bd-i" aria-hidden="true"></span><b>' + esc(b.name) + '</b><small>' + esc(b.desc) + '</small></div>').join('') + '</div>';
 }
 
 function junkSection(pen) {
@@ -526,7 +554,9 @@ function junkSection(pen) {
   return '<h2>Junk food</h2><div class="card treatsum"><div class="pen-tiles">' +
     '<div><span>Penalty</span><b>' + pen.points + '</b></div><div><span>Earned back</span><b>' + pen.back + '</b></div>' +
     '<div class="' + (pen.net > 0 ? 'owe' : 'ok') + '"><span>Still owed</span><b>' + pen.net + '</b></div></div>' +
-    '<ul class="treats">' + pen.items.map((t) => '<li><span>' + DAY_SHORT[dow(t.k)] + ' &middot; ' + esc(t.name) + '</span><small>' + num(t.kcal) + ' kcal, ' + t.points + ' pts, ' + t.earned + ' back</small></li>').join('') + '</ul>' +
+    '<ul class="treats">' + pen.items.map((t) => '<li><span>' + DAY_SHORT[dow(t.k)] + ' &middot; ' + esc(t.name) + '<small class="tstat ' + t.status + '">' +
+      (t.status === 'done' ? 'Balance done' : t.status === 'pending' ? 'Balance on ' + t.days.map((x) => DAY_SHORT[dow(x)]).join(', ') : 'Balance not completed') + '</small></span>' +
+      '<small>' + num(t.kcal) + ' kcal, ' + ptsLabel(t.points) + ', ' + t.earned + ' back</small></li>').join('') + '</ul>' +
     '<p class="muted small">About ' + num(pen.kcal) + ' extra kcal this week, close to ' + Math.round(walkMinutes(pen.kcal) / 60 * 10) / 10 + ' hours of brisk walking. Points come back by finishing the balance plan on the days after.</p></div>';
 }
 

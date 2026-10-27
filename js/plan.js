@@ -340,7 +340,7 @@ export function programWeek(k) {
   return diff < 0 ? 0 : Math.floor(diff / 7) + 1;
 }
 
-export function stepsPct(v) { return Math.min(100, Math.round((parseInt(v, 10) || 0) / STEP_GOAL * 100)); }
+export function stepsPct(v, goal) { return Math.min(100, Math.round((parseInt(v, 10) || 0) / (goal || STEP_GOAL) * 100)); }
 
 /* ---------- treats, penalty points and the balance plan ----------
    Logging junk food costs penalty points (1 point per 250 kcal rounded, min 1, max 8 for one item).
@@ -370,45 +370,85 @@ export const treatPoints = (kcal) => Math.max(1, Math.min(8, Math.round(kcal / 2
 export const ptsLabel = (n) => n + (n === 1 ? ' pt' : ' pts');
 export const walkMinutes = (kcal) => Math.round(kcal / 5); // brisk walk at about 110 kg: roughly 5 kcal a minute
 
-// What one treat asks of the following days.
-function treatPlan(kcal) {
-  const p = treatPoints(kcal);
-  if (p <= 1) return { days: 1, steps: 1500, cardio: 0, noJunk: 1 };
-  if (p <= 3) return { days: 2, steps: 2000, cardio: 0, noJunk: 1 };
-  return { days: 3, steps: 2500, cardio: 10, noJunk: 3 };
+/* Balance plan v2
+   - Logged before 6 PM: the plan is for the same day. Logged at or after 6 PM: it starts tomorrow.
+   - Big items (4+ points, like a whole pizza) spread over 2 days, others 1 day.
+   - The plan burns back about 30% of the extra calories, at most 350 kcal a day. Burning it all off
+     is not the goal (that habit is linked to more overeating); eating normally at the next meal is.
+   - Activities are picked at random for each day from low-impact options, so it is not always steps.
+     kcal per minute is scaled from Harvard Health's 30-minute table (84 kg) to about 110 kg. */
+export const BALANCE_ACTS = [
+  { id: 'steps', name: 'Extra walking', kind: 'steps', perStep: 0.055, how: 'Anywhere. Split it into 2 or 3 short walks.' },
+  { id: 'incline', name: 'Incline treadmill walk', rate: 9, how: 'Gym. Incline 8 to 12, speed 4 to 5 km/h.' },
+  { id: 'bike', name: 'Spin bike, steady', rate: 12, how: 'Gym. A pace where you can still talk.' },
+  { id: 'stairs', name: 'Stair climbing, slow', rate: 10, how: 'Home or office stairs. Hold the rail, walk down easy.' },
+  { id: 'march', name: 'Low-impact home cardio', rate: 9, how: 'March in place, step-touch, arm circles. No jumping.' },
+  { id: 'circuit', name: 'Bodyweight circuit', rate: 8, how: 'Chair squats, wall push-ups, glute bridges, marching. 40 s on, 20 s off.' },
+  { id: 'dance', name: 'Dance to music', rate: 9, how: 'Any upbeat songs at home. Just keep moving.' }
+];
+const LATE_HOUR = 18, BALANCE_SHARE = 0.3, DAY_CAP = 350;
+
+function seeded(seed) {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+// Days a treat logged on day k asks for a balance.
+export function treatDays(k, t) {
+  const hr = t.at > 1e11 ? new Date(t.at).getHours() : 12;
+  const start = hr < LATE_HOUR ? k : addDays(k, 1);
+  const n = treatPoints(t.kcal) >= 4 ? 2 : 1;
+  return Array.from({ length: n }, (_, i) => addDays(start, i));
 }
 export const treatsOn = (k) => ((S.days[k] || {}).treats || []);
 
-// Today's balance plan from treats in the last 3 days. Capped so it never becomes punishment.
+// Today's balance plan: which treats it is for, the kcal to balance, and 1 or 2 random activities.
 export function balanceFor(k) {
-  let steps = 0, cardio = 0, noJunk = false;
+  let kcal = 0;
   const from = [];
-  for (let i = 1; i <= 3; i++) {
+  for (let i = 0; i <= 2; i++) {
     const kk = addDays(k, -i);
     treatsOn(kk).forEach((t) => {
-      const pl = treatPlan(t.kcal);
-      if (i > pl.days) return;
-      steps += pl.steps; if (i <= 2) cardio += pl.cardio; if (i <= pl.noJunk) noJunk = true;
-      from.push({ k: kk, name: treatInfo(t.id).name });
+      const days = treatDays(kk, t);
+      if (!days.includes(k)) return;
+      kcal += t.kcal * BALANCE_SHARE / days.length;
+      from.push({ k: kk, name: treatInfo(t.id).name, kcal: t.kcal, points: treatPoints(t.kcal), days: days.length, late: days[0] !== kk, at: t.at });
     });
   }
-  steps = Math.min(steps, 3000); cardio = Math.min(cardio, 20);
-  if (!steps && !cardio && !noJunk) return null;
-  return { steps, cardio, noJunk, from };
+  if (!from.length) return null;
+  kcal = Math.min(DAY_CAP, Math.max(60, Math.round(kcal / 10) * 10));
+  const r = seeded('balance|' + k); // same activities all day, even if you log more later
+  const pool = BALANCE_ACTS.slice(), n = kcal > 150 ? 2 : 1, share = Math.round(kcal / n);
+  const tasks = [];
+  for (let i = 0; i < n; i++) {
+    const a = pool.splice(Math.floor(r() * pool.length), 1)[0];
+    tasks.push(a.kind === 'steps'
+      ? { id: 'act-steps', act: a, kind: 'steps', steps: Math.min(3000, Math.max(1000, Math.round(share / a.perStep / 500) * 500)), kcal: share }
+      : { id: 'act-' + a.id, act: a, kind: 'time', minutes: Math.min(30, Math.max(10, Math.round(share / a.rate / 5) * 5)), kcal: share });
+  }
+  const noJunk = from.every((f) => f.k !== k); // a junk-free day only makes sense for treats from earlier days
+  return { kcal, from, tasks, noJunk };
 }
 
-// Balance tasks done on day k: extra steps, extra cardio, junk-free.
+// Step goal for a day: 10,000 plus any extra steps from the balance plan (temporary, that day only).
+export function stepGoalFor(k) {
+  const b = balanceFor(k), t = b && b.tasks.find((x) => x.kind === 'steps');
+  return STEP_GOAL + (t ? t.steps : 0);
+}
+
 export function balanceDone(k) {
   const b = balanceFor(k);
   if (!b) return null;
-  const d = S.days[k] || {}, tasks = [];
-  if (b.steps) tasks.push({ id: 'steps', done: (parseInt(d.steps, 10) || 0) >= STEP_GOAL + b.steps });
-  if (b.cardio) tasks.push({ id: 'cardio', done: !!d.balanceCardio });
+  const d = S.days[k] || {}, ticks = d.balanceDone || {};
+  const tasks = b.tasks.map((t) => ({ id: t.id, done: t.kind === 'steps' ? (parseInt(d.steps, 10) || 0) >= stepGoalFor(k) : !!ticks[t.id] }));
   if (b.noJunk) tasks.push({ id: 'nojunk', done: !!(d.habits || {}).nojunk && !treatsOn(k).length });
-  return { tasks, done: tasks.filter((t) => t.done).length, total: tasks.length };
+  const done = tasks.filter((t) => t.done).length;
+  return { tasks, done, total: tasks.length, complete: done === tasks.length };
 }
 
-// Points for treats eaten in a week, and how many were earned back by the balance days after them.
+// Points for treats in a week and how many were earned back. Status per treat:
+// done (all balance days finished), owed (a balance day passed unfinished), pending (still to come).
 export function penaltyWeek(ws) {
   const today = todayKey();
   let points = 0, back = 0, kcal = 0;
@@ -416,18 +456,72 @@ export function penaltyWeek(ws) {
   for (let i = 0; i < 7; i++) {
     const k = addDays(ws, i);
     treatsOn(k).forEach((t) => {
-      const p = treatPoints(t.kcal), pl = treatPlan(t.kcal);
-      let ratio = 0, n = 0;
-      for (let j = 1; j <= pl.days; j++) {
-        const kk = addDays(k, j);
-        if (kk > today) continue;
+      const p = treatPoints(t.kcal), days = treatDays(k, t);
+      let ratio = 0, past = 0, pending = false;
+      days.forEach((kk) => {
+        if (kk > today) { pending = true; return; }
         const bd = balanceDone(kk);
-        if (bd && bd.total) { ratio += bd.done / bd.total; n++; }
-      }
-      const earned = Math.round(p * (n ? ratio / pl.days : 0));
+        if (bd && bd.total) { ratio += bd.done / bd.total; if (kk < today) past++; }
+        if (kk === today && !(bd && bd.complete)) pending = true;
+      });
+      const earned = Math.round(p * ratio / days.length);
+      const status = earned >= p ? 'done' : pending ? 'pending' : 'owed';
       points += p; back += earned; kcal += t.kcal;
-      items.push({ k, name: treatInfo(t.id).name, kcal: t.kcal, points: p, earned });
+      items.push({ k, name: treatInfo(t.id).name, kcal: t.kcal, points: p, earned, status, days });
     });
   }
   return { items, points, back, net: points - back, kcal };
+}
+
+/* ---------- badges ---------- */
+export function badges() {
+  const keys = Object.keys(S.days).sort();
+  const today = todayKey();
+  const best = bestStreak().days;
+  const stepsMax = Math.max(0, ...keys.map((k) => parseInt(S.days[k].steps, 10) || 0));
+  const waterDays = keys.filter((k) => (S.days[k].water || 0) >= WATER_GOAL).length;
+  let perfectWeek = false, cleanWeek = false;
+  for (let w = 1; w <= 12; w++) {
+    const ws = addDays(today, -7 * w - ((fromKey(today).getDay() + 6) % 7));
+    const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
+    const train = days.filter((k) => !planFor(k).rest);
+    const doneAll = train.every((k) => dayStats(k).pct === 100);
+    const worked = train.filter((k) => workedOut(k)).length;
+    if (doneAll) perfectWeek = true;
+    if (worked >= 4 && days.every((k) => !treatsOn(k).length)) cleanWeek = true;
+  }
+  let pr = 0;
+  const seen = {};
+  keys.forEach((k) => Object.keys(S.days[k].kg || {}).forEach((id) => {
+    const v = parseFloat(S.days[k].kg[id]);
+    if (!(v > 0)) return;
+    if (seen[id] != null && v > seen[id]) pr++;
+    seen[id] = Math.max(seen[id] || 0, v);
+  }));
+  const balanced = keys.some((k) => { const b = balanceDone(k); return b && b.complete; });
+  const bs = bodyStats(), lost = bs.current != null ? bs.lost : 0;
+  return [
+    { id: 'first', name: 'First workout', desc: 'Log your first workout day', on: totalWorkoutDays() >= 1 },
+    { id: 's3', name: '3 in a row', desc: '3 day streak', on: best >= 3 },
+    { id: 's7', name: 'Full week', desc: '7 day streak', on: best >= 7 },
+    { id: 's14', name: 'Two weeks strong', desc: '14 day streak', on: best >= 14 },
+    { id: 's30', name: 'Unstoppable', desc: '30 day streak', on: best >= 30 },
+    { id: 'perfect', name: 'Perfect week', desc: 'Every item done on all 6 days', on: perfectWeek },
+    { id: 'steps', name: '10k club', desc: '10,000 steps in a day', on: stepsMax >= 10000 },
+    { id: 'steps15', name: 'Long walker', desc: '15,000 steps in a day', on: stepsMax >= 15000 },
+    { id: 'water', name: 'Hydrated', desc: 'Water goal on 7 days', on: waterDays >= 7 },
+    { id: 'pr', name: 'Getting stronger', desc: 'Beat a personal best', on: pr >= 1 },
+    { id: 'pr10', name: 'Strength streak', desc: '10 personal bests', on: pr >= 10 },
+    { id: 'clean', name: 'Clean week', desc: '4+ workouts and no junk all week', on: cleanWeek },
+    { id: 'balance', name: 'Made it right', desc: 'Finish a balance plan', on: balanced },
+    { id: 'kg2', name: 'First 2 kg', desc: 'Lose 2 kg', on: lost >= 2 },
+    { id: 'kg5', name: 'Down 5 kg', desc: 'Lose 5 kg', on: lost >= 5 },
+    { id: 'kg10', name: 'Down 10 kg', desc: 'Lose 10 kg', on: lost >= 10 }
+  ];
+}
+
+// Last few weights for one exercise, oldest first, for the small history chart.
+export function kgHistory(id, upTo, n) {
+  return Object.keys(S.days).filter((k) => k <= upTo && parseFloat(((S.days[k] || {}).kg || {})[id]) > 0).sort()
+    .slice(-(n || 6)).map((k) => ({ k, kg: parseFloat(S.days[k].kg[id]) }));
 }

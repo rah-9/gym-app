@@ -187,6 +187,7 @@ function bodySummary(b) {
       : b.target != null ? 'Target reached.' : 'Set a target weight in the app to see progress.'
   };
 }
+const balLabel = (st) => (st === 'done' ? 'Balance done' : st === 'owed' ? 'Not completed' : 'Balance pending');
 function notesOf(r) { return weekDays(r.ws).filter((k) => (dayRead(k).note || '').trim()); }
 
 /* ---------- Word (.doc): styled HTML that Word opens with colours and tables ---------- */
@@ -238,7 +239,7 @@ export function docReport(r) {
   h += h2('Junk food') + (r.penalty.items.length
     ? '<table><tr>' + [['Penalty', r.penalty.points + ' pts'], ['Earned back', r.penalty.back + ' pts'], ['Still owed', r.penalty.net + ' pts'], ['Extra kcal', num(r.penalty.kcal)]].map((x, i) =>
         td('<div style="font-size:8.5pt;color:' + PC.muted + '">' + x[0] + '</div><div style="font-size:15pt;font-weight:bold;color:' + (i === 2 && r.penalty.net > 0 ? PC.down : PC.ink) + '">' + x[1] + '</div>', 'background:' + (i === 2 && r.penalty.net > 0 ? PC.missed : PC.tile) + ';padding:8pt;width:25%;border:1px solid #ffffff')).join('') + '</tr></table>' +
-      '<table class="t"><tr><th>Day</th><th>Food</th><th>kcal</th><th>Points</th><th>Earned back</th></tr>' + r.penalty.items.map((t) => '<tr><td>' + DAY_SHORT[dow(t.k)] + ' ' + fmt(t.k) + '</td><td>' + esc(t.name) + '</td><td>' + num(t.kcal) + '</td><td>' + t.points + '</td><td>' + t.earned + '</td></tr>').join('') + '</table>'
+      '<table class="t"><tr><th>Day</th><th>Food</th><th>kcal</th><th>Points</th><th>Back</th><th>Balance</th></tr>' + r.penalty.items.map((t) => '<tr><td>' + DAY_SHORT[dow(t.k)] + ' ' + fmt(t.k) + '</td><td>' + esc(t.name) + '</td><td>' + num(t.kcal) + '</td><td>' + t.points + '</td><td>' + t.earned + '</td><td style="font-weight:bold;color:' + (t.status === 'done' ? PC.up : t.status === 'owed' ? PC.down : PC.muted) + '">' + balLabel(t.status) + '</td></tr>').join('') + '</table>'
     : '<p style="color:' + PC.muted + '">Clean week. No junk food logged.</p>');
   // missed
   h += h2('Missed') + (r.missed.length ? r.missed.map((m) => '<p style="margin:3pt 0"><span style="background:' + PC.missed + ';color:' + PC.down + ';font-weight:bold;padding:1pt 6pt">' + DAY_SHORT[dow(m.k)] + '</span> ' + esc(m.items.join(', ')) + '</p>').join('') : '<p style="color:' + PC.muted + '">Nothing missed. Clean week.</p>');
@@ -397,7 +398,8 @@ export function pdfReport(r) {
       pen.items.forEach((t) => {
         need(18); font(9.5, 'normal', PC.ink);
         doc.text(DAY_SHORT[dow(t.k)] + ' ' + fmt(t.k) + '   ' + t.name, M, y + 10);
-        font(9, 'normal', PC.muted); doc.text(num(t.kcal) + ' kcal, ' + t.points + ' pts, ' + t.earned + ' back', W - M, y + 10, { align: 'right' });
+        font(9, 'normal', PC.muted); doc.text(num(t.kcal) + ' kcal, ' + t.points + ' pts, ' + t.earned + ' back', W - M - 110, y + 10, { align: 'right' });
+        font(8.5, 'bold', t.status === 'done' ? PC.up : t.status === 'owed' ? PC.down : PC.muted); doc.text(balLabel(t.status), W - M, y + 10, { align: 'right' });
         y += 16;
       });
     } else { font(9.5, 'normal', PC.muted); doc.text('Clean week. No junk food logged.', M, y + 4); y += 12; }

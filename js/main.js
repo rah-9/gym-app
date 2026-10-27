@@ -1,6 +1,6 @@
 /* App start-up and all tap/typing handlers. */
 import { S, save, backupNow, checkBackupSchedule, autoRestore, restoreLatest, importBackup, exportBackup, wipeAll, requestPersistentStorage } from './store.js';
-import { planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct, streak, monthStats, bestKg, sessionMinutes, EX_NAMES, WATER_GOAL, noteTarget, treatInfo, treatPoints, ptsLabel, balanceFor } from './plan.js';
+import { planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct, streak, monthStats, bestKg, sessionMinutes, EX_NAMES, WATER_GOAL, noteTarget, treatInfo, treatPoints, ptsLabel, balanceFor, stepGoalFor, treatDays } from './plan.js';
 import { reportData, reportText, docReport, pdfReport } from './report.js';
 import { ui, render, stepsNote, daySheetHtml, noteStatus, sessionLabel, treatSheetHtml } from './views.js';
 import { startRest, addRest, setRestEnd, stopRest } from './timer.js';
@@ -138,7 +138,8 @@ function openTreatSheet() {
     d.treats = (d.treats || []).concat([{ id: info.id, kcal: info.kcal, at: Date.now() }]);
     d.habits.nojunk = false;
     save(); close(); render();
-    toast(info.name + ' logged, ' + ptsLabel(treatPoints(info.kcal)) + '. A small balance plan starts tomorrow.');
+    const days = treatDays(ui.selDate, d.treats[d.treats.length - 1]);
+    toast(info.name + ' logged, ' + ptsLabel(treatPoints(info.kcal)) + '. Balance plan ' + (days[0] === todayKey() ? 'added to today' : 'starts tomorrow') + (days.length > 1 ? ', over 2 days' : '') + '.');
   });
 }
 
@@ -210,7 +211,12 @@ const ACTIONS = {
     const d = dayWrite(ui.selDate);
     (d.treats || []).splice(+el.dataset.i, 1); save(); render(); toast('Removed.');
   },
-  'balance-cardio': () => { const d = dayWrite(ui.selDate); d.balanceCardio = !d.balanceCardio; save(); render(); if (d.balanceCardio) toast('Extra cardio done. Points coming back.'); },
+  'balance-tick': (el) => {
+    const d = dayWrite(ui.selDate);
+    d.balanceDone = Object.assign({}, d.balanceDone);
+    d.balanceDone[el.dataset.id] = !d.balanceDone[el.dataset.id];
+    save(); render(); if (d.balanceDone[el.dataset.id]) toast('Done. Points coming back.');
+  },
   expand: (el) => { const id = el.dataset.id; ui.open[id] = el.getAttribute('aria-expanded') !== 'true'; render(); },
   set: (el) => toggleSet(el.dataset.id, +el.dataset.i),
   habit: (el) => { const d = dayWrite(ui.selDate); d.habits[el.dataset.id] = !d.habits[el.dataset.id]; save(); render(); },
@@ -314,8 +320,8 @@ document.addEventListener('input', (ev) => {
     d.habits.steps = n >= STEP_GOAL;
     save();
     const b = $('#steps-bar'), nt = $('#steps-note');
-    if (b) b.style.width = stepsPct(n) + '%';
-    if (nt) nt.textContent = stepsNote(n);
+    if (b) b.style.width = stepsPct(n, stepGoalFor(ui.selDate)) + '%';
+    if (nt) nt.textContent = stepsNote(n, stepGoalFor(ui.selDate));
   }
 });
 
@@ -401,9 +407,10 @@ function remindTick() {
     nudge('water', 'Drink water', 'Time for a glass of water. ' + water + ' of ' + WATER_GOAL + ' glasses today.');
   }
   const steps = parseInt(d.steps, 10) || 0;
-  if (r.steps !== false && h >= 17 && steps < STEP_GOAL && t - (S.settings.lastStepsRemind || 0) >= 120 * 60000) {
+  const goal = stepGoalFor(todayKey());
+  if (r.steps !== false && h >= 17 && steps < goal && t - (S.settings.lastStepsRemind || 0) >= 120 * 60000) {
     S.settings.lastStepsRemind = t; save();
-    nudge('steps', 'Time to walk', (steps ? steps.toLocaleString('en-IN') + ' of ' + STEP_GOAL.toLocaleString('en-IN') + ' steps. ' : 'Steps not logged yet. ') + 'A 15 minute walk adds about 1,800 steps.');
+    nudge('steps', 'Time to walk', (steps ? steps.toLocaleString('en-IN') + ' of ' + goal.toLocaleString('en-IN') + ' steps. ' : 'Steps not logged yet. ') + 'A 15 minute walk adds about 1,800 steps.');
   }
 }
 setInterval(remindTick, 60000);
