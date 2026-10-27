@@ -94,14 +94,59 @@ export function lastKg(k, id) {
   return null;
 }
 
-// Last weight used, and a suggested next weight when every set was finished that day.
+// Heaviest weight ever logged for an exercise, before day `beforeK` when given.
+export function bestKg(id, beforeK) {
+  let best = null;
+  Object.keys(S.days).forEach((k) => {
+    if (beforeK && k >= beforeK) return;
+    const v = parseFloat(((S.days[k] || {}).kg || {})[id]);
+    if (v > 0 && (!best || v > best.kg)) best = { kg: v, k };
+  });
+  return best;
+}
+
+// Progressive overload advice from the last session of this exercise:
+//  up   = every set was done last time, so add the smallest jump
+//  stay = sets were left last time, so keep the weight and finish them first
+//  same = the same weight was used 3 sessions in a row with all sets done, push harder
 export function weightHint(k, e) {
   const last = lastKg(k, e.id);
   if (!last) return null;
-  const done = ((S.days[last.k] || {}).sets || {})[e.id] || [];
-  const allSets = e.sets > 1 && done.length >= e.sets && done.slice(0, e.sets).every(Boolean);
+  const ld = S.days[last.k] || {};
+  const setsDone = ((ld.sets || {})[e.id] || []).slice(0, e.sets).filter(Boolean).length;
+  const allSets = !!((ld.done || {})[e.id]) || (e.sets > 0 && setsDone >= e.sets);
   const step = last.kg < 10 ? 1 : 2.5;
-  return { kg: last.kg, k: last.k, allSets, next: Math.round((last.kg + step) * 10) / 10 };
+  const next = Math.round((last.kg + step) * 10) / 10;
+  let streakSame = 0;
+  for (let i = 1, kk = k; i <= 60 && streakSame < 3; i++) {
+    kk = addDays(k, -i);
+    const v = parseFloat(((S.days[kk] || {}).kg || {})[e.id]);
+    if (!v) continue;
+    if (v === last.kg) streakSame++; else break;
+  }
+  const best = bestKg(e.id, k);
+  return {
+    kg: last.kg, k: last.k, allSets, setsDone, next, best: best ? best.kg : null,
+    status: allSets ? (streakSame >= 3 ? 'push' : 'up') : 'stay'
+  };
+}
+
+// The note you wrote the last time you did this same workout, as a reminder.
+export function lastNoteFor(k) {
+  const key = workoutKeyFor(k);
+  for (let i = 1; i <= 70; i++) {
+    const kk = addDays(k, -i), d = S.days[kk];
+    if (d && (d.note || '').trim() && workoutKeyFor(kk) === key) return { k: kk, note: d.note.trim() };
+  }
+  return null;
+}
+
+// Session length in minutes from the first tick to the finish (or now if still going).
+export function sessionMinutes(k) {
+  const d = S.days[k];
+  if (!d || !d.start) return null;
+  const end = d.end || (k === todayKey() ? Date.now() : d.lastTick || d.start);
+  return Math.max(0, Math.round((end - d.start) / 60000));
 }
 
 // Main muscles a workout trains, short names, in order of first use.

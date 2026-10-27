@@ -1,8 +1,8 @@
 /* App start-up and all tap/typing handlers. */
 import { S, save, backupNow, checkBackupSchedule, autoRestore, restoreLatest, importBackup, exportBackup, wipeAll, requestPersistentStorage } from './store.js';
-import { planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct, streak, monthStats } from './plan.js';
+import { planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct, streak, monthStats, bestKg, sessionMinutes, EX_NAMES } from './plan.js';
 import { reportData, reportText, docReport, pdfReport } from './report.js';
-import { ui, render, stepsNote } from './views.js';
+import { ui, render, stepsNote, daySheetHtml, noteStatus, sessionLabel } from './views.js';
 import { startRest, addRest, setRestEnd, stopRest } from './timer.js';
 import { initLock, isUnlocked, showLock, lockNow, recordActivity } from './lock.js';
 import * as notify from './notify.js';
@@ -35,7 +35,9 @@ function celebrate(justTicked) {
   }
   const d = dayWrite(k);
   if (d.celebrated) { if (justTicked) toast(p.rest ? 'Rest day done.' : 'Workout complete.'); return; }
-  d.celebrated = true; save();
+  d.celebrated = true;
+  if (d.start && !d.end && k === todayKey()) d.end = Date.now();
+  save();
   showCelebration(k, st, p);
 }
 
@@ -54,7 +56,7 @@ function showCelebration(k, st, p) {
     (milestone ? '<div class="cel-milestone">' + milestone + ' day streak</div>' : '') +
     '<p class="cel-line">' + line + '</p>' +
     (p.rest ? '' : '<div class="cel-stats">' +
-      '<div><b>' + st.done + '</b><span>items done</span></div>' +
+      (sessionMinutes(k) != null ? '<div><b>' + sessionMinutes(k) + '</b><span>minutes</span></div>' : '<div><b>' + st.done + '</b><span>items done</span></div>') +
       '<div><b>' + st.sets + '</b><span>sets</span></div>' +
       '<div><b>' + sk + '</b><span>day streak</span></div>' +
       '<div><b>' + m.worked + '</b><span>days in ' + m.name + '</span></div></div>') +
@@ -81,7 +83,7 @@ function confetti(canvas) {
   if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return () => {};
   const ctx = canvas.getContext('2d'), dpr = window.devicePixelRatio || 1;
   const W = canvas.width = innerWidth * dpr, H = canvas.height = innerHeight * dpr;
-  const colors = ['#a78bfa', '#8b5cf6', '#22d3ee', '#f5c451', '#f472b6', '#f5f6ff'];
+  const colors = ['#ffffff', '#e4e4ea', '#b9a8ff', '#d9d0ff', '#f5c451', '#c9c9d1'];
   const parts = Array.from({ length: 130 }, () => ({
     x: W / 2 + (Math.random() - 0.5) * W * 0.3, y: H * 0.42,
     vx: (Math.random() - 0.5) * 16 * dpr, vy: (-Math.random() * 15 - 6) * dpr,
@@ -104,15 +106,46 @@ function confetti(canvas) {
   return () => { live = false; cancelAnimationFrame(raf); };
 }
 
+// Bottom sheet with one day's details, opened from the Report calendar.
+function openSheet(k) {
+  const el = document.createElement('div');
+  el.className = 'sheet';
+  el.innerHTML = daySheetHtml(k);
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  const close = () => { el.classList.remove('show'); setTimeout(() => el.remove(), 250); };
+  el.addEventListener('click', (ev) => {
+    if (ev.target === el) return close();
+    const b = ev.target.closest('[data-sheet]');
+    if (!b) return;
+    close();
+    if (b.dataset.sheet === 'open') { ui.selDate = b.dataset.k; ui.view = 'today'; ui.open = {}; render(); top(); }
+  });
+}
+
+// Keep the session time on the hero ticking while the app is open.
+setInterval(() => {
+  const s = $('#sess');
+  if (s) s.textContent = sessionLabel(ui.selDate);
+}, 30000);
+
 function markJustDone(id, on) {
   if (!on) return;
   ui.justDone = id;
   setTimeout(() => { if (ui.justDone === id) ui.justDone = null; }, 700);
 }
 
+// The session clock starts at the first tick of the day and stops when the day is finished.
+function stamp(d, on) {
+  if (!on || ui.selDate !== todayKey()) return;
+  if (!d.start) d.start = Date.now();
+  d.lastTick = Date.now();
+}
+
 function toggleDone(id) {
   const d = dayWrite(ui.selDate);
   d.done[id] = !d.done[id];
+  stamp(d, d.done[id]);
   const e = findEx(ui.selDate, id);
   if (e && e.sets > 1) {
     // Ticking the whole exercise fills every set; unticking clears them so the two never disagree.
@@ -131,6 +164,7 @@ function toggleSet(id, i) {
   while (arr.length < ex.sets) arr.push(false);
   arr[i] = !arr[i];
   d.sets[id] = arr;
+  stamp(d, arr[i]);
   const all = arr.every(Boolean);
   d.done[id] = all;
   markJustDone(id, all);
@@ -151,6 +185,7 @@ function notifyOn() {
 let wipeArmed = false;
 const ACTIONS = {
   done: (el) => toggleDone(el.dataset.id),
+  'cal-day': (el) => openSheet(el.dataset.k),
   expand: (el) => { const id = el.dataset.id; ui.open[id] = el.getAttribute('aria-expanded') !== 'true'; render(); },
   set: (el) => toggleSet(el.dataset.id, +el.dataset.i),
   habit: (el) => { const d = dayWrite(ui.selDate); d.habits[el.dataset.id] = !d.habits[el.dataset.id]; save(); render(); },
@@ -214,7 +249,11 @@ document.addEventListener('click', (ev) => {
 document.addEventListener('input', (ev) => {
   const t = ev.target;
   if (t.dataset.kg) { dayWrite(ui.selDate).kg[t.dataset.kg] = t.value; save(); }
-  else if (t.dataset.note) { dayWrite(ui.selDate).note = t.value; save(); }
+  else if (t.dataset.note) {
+    const d = dayWrite(ui.selDate);
+    d.note = t.value; d.noteAt = Date.now(); save();
+    const ns = $('#note-status'); if (ns) ns.textContent = noteStatus(d);
+  }
   else if (t.dataset.steps) {
     const d = dayWrite(ui.selDate), n = parseInt(t.value, 10) || 0;
     d.steps = n > 0 ? n : '';
@@ -229,6 +268,12 @@ document.addEventListener('input', (ev) => {
 document.addEventListener('change', (ev) => {
   const t = ev.target;
   if (t.dataset.steps) { render(); return; }
+  if (t.dataset.kg) {
+    // New personal best alert when you type a heavier weight than ever before.
+    const v = parseFloat(t.value), best = bestKg(t.dataset.kg, ui.selDate);
+    if (v > 0 && best && v > best.kg) toast('New personal best: ' + (EX_NAMES[t.dataset.kg] || 'lift') + ', ' + v + ' kg. Previous ' + best.kg + ' kg.');
+    return; // no re-render here, so tapping the next box keeps the keyboard open
+  }
   if (t.dataset.swap) {
     if (hasProgress(ui.selDate)) return;
     dayWrite(ui.selDate).plan = t.value;

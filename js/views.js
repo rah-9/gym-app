@@ -4,7 +4,7 @@ import { S } from './store.js';
 import {
   planFor, workoutKeyFor, schedule, dayRead, dayStats, dayStatus, hasProgress, mainExercises, bonusExercises,
   weightHint, musclesFor, nextUp, programWeek, counts, stepsPct, STEP_GOAL, STATUS_LABEL, WEEK_ORDER,
-  streak, monthStats
+  streak, monthStats, lastNoteFor, sessionMinutes, bestKg, requiredItems, EX_NAMES
 } from './plan.js';
 import { reportData, bestLabel } from './report.js';
 import * as notify from './notify.js';
@@ -14,10 +14,10 @@ export const ui = { view: 'today', selDate: todayKey(), reportWs: weekStartOf(to
 
 // Each workout has its own colour so every day of the week feels different.
 export const DAY_COLORS = {
-  chest: '#f472b6', push: '#f472b6', arms: '#22d3ee', back: '#818cf8', shoulders: '#fbbf24',
-  armsplus: '#a78bfa', legday: '#60a5fa', legs: '#60a5fa', rest: '#94a3b8'
+  chest: '#f9a8d4', push: '#f9a8d4', arms: '#c4b5fd', back: '#a5b4fc', shoulders: '#fcd34d',
+  armsplus: '#ddd6fe', legday: '#93c5fd', legs: '#93c5fd', rest: '#cbd5e1'
 };
-const dayColor = (k) => DAY_COLORS[workoutKeyFor(k)] || '#8b5cf6';
+const dayColor = (k) => DAY_COLORS[workoutKeyFor(k)] || '#b9a8ff';
 
 // A different line every day of the year.
 const LINES = [
@@ -101,9 +101,15 @@ function exerciseCard(e, d, isBonus, isNext) {
     ? '<label class="kg"><input type="number" inputmode="decimal" min="0" step="0.5" data-kg="' + esc(e.id) +
       '" value="' + esc(d.kg[e.id] || '') + '" placeholder="' + (last ? last.kg : '0') + '" aria-label="' + esc(e.name) + ' weight"><span>kg</span></label>'
     : '';
-  const lastNote = !last ? '' : last.allSets && !d.kg[e.id]
-    ? '<span class="last up-hint">Try <b>' + last.next + ' kg</b>, last ' + last.kg + '</span>'
-    : '<span class="last">Last ' + last.kg + ' kg</span>';
+  const todayKg = parseFloat(d.kg[e.id]);
+  const isPR = hasKg && todayKg > 0 && last && last.best != null && todayKg > last.best;
+  let lastNote = '';
+  if (isPR) lastNote = '<span class="hint pr"><b>New best ' + todayKg + ' kg</b><small>previous best ' + last.best + ' kg</small></span>';
+  else if (last && !(todayKg > 0)) {
+    lastNote = last.status === 'stay'
+      ? '<span class="hint stay"><b>Stay at ' + last.kg + ' kg</b><small>last time ' + last.setsDone + ' of ' + e.sets + ' sets, finish them all first</small></span>'
+      : '<span class="hint up"><b>&#8593; Go up to ' + last.next + ' kg</b><small>' + (last.status === 'push' ? 'same ' + last.kg + ' kg 3 times, time to push' : 'last time ' + last.kg + ' kg, all sets done') + '</small></span>';
+  } else if (last) lastNote = '<span class="hint"><small>last time ' + last.kg + ' kg' + (last.best && last.best !== last.kg ? ', best ' + last.best : '') + '</small></span>';
   const watch = e.video ? '<a class="watch" href="' + esc(e.video) + '" target="_blank" rel="noopener" aria-label="Watch how to do ' + esc(e.name) + '">How to <span aria-hidden="true">&#8599;</span></a>' : '';
   const tools = (!done || open) && (dots || kgField || watch)
     ? '<div class="tools">' + (dots ? '<div class="dots">' + dots + '</div>' : '') + kgField + lastNote + watch + '</div>' : '';
@@ -141,10 +147,33 @@ function weekStrip(k) {
 function ring(pct) {
   const r = 26, c = 2 * Math.PI * r, off = c * (1 - pct / 100);
   return '<svg class="ring' + (pct === 100 ? ' full' : '') + '" viewBox="0 0 64 64" aria-hidden="true">' +
-    '<defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c4b5fd"/><stop offset="0.5" stop-color="#8b5cf6"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>' +
+    '<defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#b9a8ff"/></linearGradient></defs>' +
     '<circle cx="32" cy="32" r="' + r + '" class="ring-bg"/>' +
     '<circle cx="32" cy="32" r="' + r + '" class="ring-fg" stroke="url(#ringGrad)" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '"/>' +
     '<text x="32" y="37" text-anchor="middle">' + pct + '%</text></svg>';
+}
+
+// Mon to Sat as one segmented bar, coloured by how each day went.
+function weekBar(k) {
+  const ws = weekStartOf(k), days = weekDays(ws).filter((dk) => !planFor(dk).rest);
+  const done = days.filter((dk) => dayStatus(dk) === 'done').length;
+  return '<div class="weekbar"><div class="wb-segs">' + days.map((dk) =>
+    '<i class="' + dayStatus(dk) + (dk === todayKey() ? ' now' : '') + '" title="' + DAY_SHORT[dow(dk)] + '"></i>').join('') +
+    '</div><span>' + done + ' of ' + days.length + ' this week</span></div>';
+}
+
+// Lifts ready to go heavier today.
+function readyToLift(k) {
+  const p = planFor(k);
+  if (p.rest) return 0;
+  return p.exercises.filter((e) => { const h = weightHint(k, e); return h && (h.status === 'up' || h.status === 'push') && !(parseFloat(dayRead(k).kg[e.id]) > 0); }).length;
+}
+
+export function sessionLabel(k) {
+  const m = sessionMinutes(k);
+  if (m == null) return '';
+  const d = dayRead(k);
+  return (d.end ? 'Session ' : 'Session running ') + (m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min');
 }
 
 // Streak and month count under today's title.
@@ -169,11 +198,12 @@ function hero(k) {
     '<div class="hero-top"><div class="hero-text">' +
     '<div class="eyebrow">' + DAY_NAMES[dow(k)] + ', ' + fmt(k) + (k === today ? ' &middot; today' : '') + (wk ? ' &middot; week ' + wk : '') + '</div>' +
     '<h1>' + esc(p.focus) + '</h1>' +
-    '<div class="hero-sub">' + st.done + ' of ' + st.total + ' done' + (st.sets ? ' &middot; ' + st.sets + ' sets' : '') + '</div>' +
+    '<div class="hero-sub">' + st.done + ' of ' + st.total + ' done' + (st.sets ? ' &middot; ' + st.sets + ' sets' : '') +
+      (sessionLabel(k) ? ' &middot; <span id="sess">' + sessionLabel(k) + '</span>' : '') + '</div>' +
     (musclesFor(p).length ? '<div class="hero-works">Works ' + musclesFor(p).map(esc).join(', ') + '</div>' : '') +
     '</div>' + ring(st.pct) + '</div>' +
-    (k === today ? heroStats() : '') +
-    (sub ? '<div class="hero-next">' + esc(sub) + '</div>' : '') + swap +
+    (k === today ? heroStats() : '') + (p.rest ? '' : weekBar(k)) +
+    (sub ? '<div class="hero-next">' + esc(sub) + (!complete && readyToLift(k) ? '<span class="hero-lift">' + readyToLift(k) + ' lifts ready to go heavier today</span>' : '') + '</div>' : '') + swap +
     (k === today ? '<div class="hero-quote">' + esc(dailyLine(k)) + '</div>' : '') +
     '</section>';
 }
@@ -224,6 +254,8 @@ function renderToday() {
   } else {
     const nx = nextUp(k);
     const nextId = nx && k === today ? nx.id : null;
+    const ln = lastNoteFor(k);
+    if (ln) body += '<div class="memo"><span class="memo-h">Your note from last ' + esc(p.short) + ' day, ' + DAY_SHORT[dow(ln.k)] + ' ' + fmt(ln.k) + '</span><p>' + esc(ln.note) + '</p></div>';
     body += '<h2>Workout <span class="h-note">top to bottom, tap a name for tips</span></h2><ul class="list">' +
       mainExercises(p).map((e) => exerciseCard(e, d, false, e.id === nextId)).join('') + '</ul>';
     body += '<h2>Bonus <span class="h-note">if your body allows today</span></h2>' +
@@ -245,7 +277,8 @@ function renderToday() {
   body += '<details class="diet"' + (S.settings.dietOpen ? ' open' : '') + '><summary data-action="diet-toggle"><span>Diet plan <span class="h-note">optional, veg ghar ka khana</span></span><span class="muted">' + mealsDone + '/' + MEALS.length + '</span></summary>' +
     '<ul class="list compact">' + MEALS.map((m) => simpleCard('meal', m.id, !!d.meals[m.id], m.name, m.detail)).join('') + '</ul></details>';
 
-  body += '<h2>Notes</h2><textarea data-note="1" rows="3" placeholder="How did it feel? Any pain? New weights?" aria-label="Notes">' + esc(d.note || '') + '</textarea>';
+  body += '<h2>Notes <span class="h-note">shown again next ' + esc(p.short) + ' day</span></h2><textarea data-note="1" rows="3" placeholder="How did it feel? Any pain? What to change next time?" aria-label="Notes">' + esc(d.note || '') + '</textarea>' +
+    '<div class="note-status" id="note-status">' + noteStatus(d) + '</div>';
   if (k !== today) body += '<button type="button" class="ghost wide" data-action="pick" data-k="' + today + '">Back to today</button>';
 
   return weekStrip(k) + (k === today ? notifyPrompt() + reminderHtml() : '') + hero(k) + body;
@@ -323,12 +356,48 @@ function monthCalendar(k) {
   for (let i = 0; i < days; i++) {
     const dk = addDays(first, i), st = dayStatus(dk), p = planFor(dk);
     const cls = p.rest && st !== 'done' ? 'rest' : st === 'today' && hasProgress(dk) ? 'partial' : st;
-    cells += '<span class="cal-cell ' + cls + (dk === today ? ' is-today' : '') + '" title="' + esc(fmt(dk) + ', ' + p.short + ': ' + (STATUS_LABEL[st] || '')) + '">' + (i + 1) + '</span>';
+    cells += '<button type="button" class="cal-cell ' + cls + (dk === today ? ' is-today' : '') + '" data-action="cal-day" data-k="' + dk + '" aria-label="' + esc(fmt(dk) + ', ' + p.short + ': ' + (STATUS_LABEL[st] || '')) + '">' + (i + 1) + '</button>';
   }
   const head = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((x) => '<span class="cal-head">' + x + '</span>').join('');
   return '<div class="cal card"><div class="cal-top"><b>' + esc(monthStats(k).name) + ' ' + y + '</b>' +
     '<span class="cal-legend"><i class="lg done"></i>Done<i class="lg partial"></i>Part<i class="lg missed"></i>Missed</span></div>' +
+    '<p class="cal-hint">Tap a day to see what you did.</p>' +
     '<div class="cal-grid">' + head + cells + '</div></div>';
+}
+
+export function noteStatus(d) {
+  if (!(d.note || '').trim()) return 'Saved on this phone as you type. It comes back as a reminder next time.';
+  return 'Saved' + (d.noteAt ? ' at ' + clockTime(d.noteAt) : '') + ' on this phone. You will see it again next time.';
+}
+
+// Day detail sheet, opened from the Report calendar.
+export function daySheetHtml(k) {
+  const p = planFor(k), d = dayRead(k), st = dayStats(k), status = dayStatus(k);
+  const req = requiredItems(k);
+  const doneList = req.filter((it) => d.done[it.id]).map((it) => it.name);
+  const missList = req.filter((it) => !d.done[it.id]).map((it) => it.name);
+  const kgRows = Object.keys(d.kg || {}).filter((id) => parseFloat(d.kg[id]) > 0).map((id) => {
+    const best = bestKg(id, k), v = parseFloat(d.kg[id]);
+    return '<li><span>' + esc(EX_NAMES[id] || id) + '</span><b>' + v + ' kg' + (best && v > best.kg ? ' <em>best</em>' : '') + '</b></li>';
+  }).join('');
+  const mins = sessionMinutes(k);
+  const chips = [
+    st.sets ? st.sets + ' sets' : '', mins != null ? mins + ' min' : '', st.steps ? num(st.steps) + ' steps' : '',
+    st.bonusDone ? st.bonusDone + ' bonus' : ''
+  ].filter(Boolean).map((c) => '<span>' + c + '</span>').join('');
+  return '<div class="sheet-card" role="dialog" aria-label="' + esc(fmt(k)) + '">' +
+    '<div class="sheet-grab" aria-hidden="true"></div>' +
+    '<div class="sheet-head"><div><div class="eyebrow">' + DAY_NAMES[dow(k)] + ', ' + fmt(k) + '</div><h2>' + esc(p.focus) + '</h2></div>' +
+    '<span class="pill ' + status + '">' + (STATUS_LABEL[status] || '') + '</span></div>' +
+    (p.rest ? '' : '<div class="sheet-prog"><div class="bar"><span style="width:' + st.pct + '%"></span></div><span>' + st.done + ' of ' + st.total + ' done, ' + st.pct + '%</span></div>') +
+    (chips ? '<div class="sheet-chips">' + chips + '</div>' : '') +
+    (doneList.length ? '<h3>Done</h3><ul class="sheet-list ok">' + doneList.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
+    (missList.length && k <= todayKey() ? '<h3>' + (k === todayKey() ? 'Still to do' : 'Missed') + '</h3><ul class="sheet-list no">' + missList.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
+    (kgRows ? '<h3>Weights</h3><ul class="sheet-kg">' + kgRows + '</ul>' : '') +
+    ((d.note || '').trim() ? '<h3>Note</h3><p class="sheet-note">' + esc(d.note) + '</p>' : '') +
+    (!doneList.length && !kgRows && !(d.note || '').trim() && k <= todayKey() ? '<p class="muted">Nothing logged on this day.</p>' : '') +
+    '<div class="sheet-actions"><button type="button" class="primary" data-sheet="open" data-k="' + k + '">' + (k === todayKey() ? 'Go to today' : 'Open this day') + '</button>' +
+    '<button type="button" class="ghost" data-sheet="close">Close</button></div></div>';
 }
 
 /* ---------- Plan ---------- */
