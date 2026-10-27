@@ -77,7 +77,7 @@ function exerciseCard(e, d, isBonus, isNext) {
     ? '<div class="more">' + (e.tip ? '<p class="tip">' + esc(e.tip) + '</p>' : '') + works(e) +
       (e.rest ? '<button type="button" class="chip" data-action="rest" data-sec="' + e.rest + '" data-name="' + esc(e.name) + '">Start rest timer, ' + restLabel(e.rest) + '</button>' : '') + '</div>'
     : '';
-  return '<li class="card ex' + (done ? ' done' : '') + (isBonus ? ' bonus' : '') + (isNext ? ' next' : '') + (open ? ' open' : '') + '">' +
+  return '<li class="card ex' + (done ? ' done' : '') + (isBonus ? ' bonus' : '') + (isNext ? ' next' : '') + (open ? ' open' : '') + (ui.justDone === e.id ? ' just-done' : '') + '">' +
     '<div class="row">' + checkbox('done', e.id, done, 'Mark ' + e.name + ' done') +
     '<button type="button" class="ex-main" data-action="expand" data-id="' + esc(e.id) + '" aria-expanded="' + open + '">' +
     '<span class="ex-text">' + (isNext ? '<span class="upnext">Up next</span>' : '') +
@@ -106,8 +106,10 @@ function weekStrip(k) {
 
 function ring(pct) {
   const r = 26, c = 2 * Math.PI * r, off = c * (1 - pct / 100);
-  return '<svg class="ring" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="' + r + '" class="ring-bg"/>' +
-    '<circle cx="32" cy="32" r="' + r + '" class="ring-fg" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '"/>' +
+  return '<svg class="ring' + (pct === 100 ? ' full' : '') + '" viewBox="0 0 64 64" aria-hidden="true">' +
+    '<defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7CF0C0"/><stop offset="1" stop-color="#2BB8D9"/></linearGradient></defs>' +
+    '<circle cx="32" cy="32" r="' + r + '" class="ring-bg"/>' +
+    '<circle cx="32" cy="32" r="' + r + '" class="ring-fg" stroke="url(#ringGrad)" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '"/>' +
     '<text x="32" y="37" text-anchor="middle">' + pct + '%</text></svg>';
 }
 
@@ -126,7 +128,9 @@ function hero(k) {
   const swap = canSwap
     ? '<label class="swap"><span>Change workout</span><select data-swap="1" aria-label="Workout for this day">' + workoutOptions(workoutKeyFor(k)) + '</select></label>'
     : '';
-  return '<section class="hero">' +
+  const complete = !p.rest && st.pct === 100;
+  return '<section class="hero' + (complete ? ' complete' : '') + '">' +
+    (complete ? '<div class="hero-badge">Workout complete</div>' : '') +
     '<div class="hero-top"><div class="hero-text">' +
     '<div class="eyebrow">' + DAY_NAMES[dow(k)] + ', ' + fmt(k) + (k === today ? ' &middot; today' : '') + (wk ? ' &middot; week ' + wk : '') + '</div>' +
     '<h1>' + esc(p.focus) + '</h1>' +
@@ -260,7 +264,7 @@ function renderReport() {
     '<div class="rtitle"><div class="eyebrow">Weekly report</div><h1>' + fmt(r.ws) + ' to ' + fmt(r.we) + '</h1></div>' +
     '<button type="button" class="arrow" data-action="rweek" data-n="7" aria-label="Next week">&#8250;</button></div>' +
     '<p class="verdict">' + esc(r.verdict) + '</p>' +
-    '<div class="tiles three">' + tiles + '</div>' +
+    '<div class="tiles three">' + tiles + '</div>' + monthCalendar(r.asOf) +
     '<div class="stats">' + statRows + '</div>' +
     '<h2>Day by day</h2><div class="tablewrap"><table class="days"><thead><tr><th>Day</th><th>Workout</th><th class="num">Done</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<h2>Missed</h2>' + missed + todo +
@@ -271,6 +275,24 @@ function renderReport() {
     '<button type="button" class="primary" data-action="pdf-report">PDF</button>' +
     '<button type="button" class="ghost" data-action="doc-report">Word</button>' +
     '<button type="button" class="ghost" data-action="copy-report">Copy text</button></div>';
+}
+
+// Month calendar: every day coloured by how it went. Green done, amber part done, coral missed.
+function monthCalendar(k) {
+  const d = fromKey(k), y = d.getFullYear(), m = d.getMonth(), today = todayKey();
+  const first = keyOf(new Date(y, m, 1)), days = new Date(y, m + 1, 0).getDate();
+  const lead = (new Date(y, m, 1).getDay() + 6) % 7; // Monday first
+  let cells = '';
+  for (let i = 0; i < lead; i++) cells += '<span class="cal-cell empty"></span>';
+  for (let i = 0; i < days; i++) {
+    const dk = addDays(first, i), st = dayStatus(dk), p = planFor(dk);
+    const cls = p.rest && st !== 'done' ? 'rest' : st === 'today' && hasProgress(dk) ? 'partial' : st;
+    cells += '<span class="cal-cell ' + cls + (dk === today ? ' is-today' : '') + '" title="' + esc(fmt(dk) + ', ' + p.short + ': ' + (STATUS_LABEL[st] || '')) + '">' + (i + 1) + '</span>';
+  }
+  const head = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((x) => '<span class="cal-head">' + x + '</span>').join('');
+  return '<div class="cal card"><div class="cal-top"><b>' + esc(monthStats(k).name) + ' ' + y + '</b>' +
+    '<span class="cal-legend"><i class="lg done"></i>Done<i class="lg partial"></i>Part<i class="lg missed"></i>Missed</span></div>' +
+    '<div class="cal-grid">' + head + cells + '</div></div>';
 }
 
 /* ---------- Plan ---------- */

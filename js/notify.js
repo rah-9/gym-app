@@ -73,7 +73,7 @@ export function workoutProgress(info) {
   const complete = info.pct === 100;
   show('workout',
     complete ? info.title + ' done' : info.title + ' · ' + info.done + ' of ' + info.total,
-    complete ? 'Workout complete. Eat your protein.' : (info.next ? 'Up next: ' + info.next : 'Almost there.'),
+    complete ? 'Workout complete. Great work today.' : (info.next ? 'Up next: ' + info.next : 'Almost there.'),
     { silent: !complete, renotify: complete, vibrate: complete ? [120, 60, 120] : undefined });
 }
 

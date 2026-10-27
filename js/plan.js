@@ -67,7 +67,8 @@ export function findEx(k, id) {
 
 export const EX_NAMES = (() => {
   const m = {};
-  Object.values(WORKOUTS).forEach((p) => { if (!p.rest) p.exercises.forEach((e) => { m[e.id] = e.name; }); });
+  // First use wins, so a main exercise name is not replaced by a lighter bonus version of it.
+  Object.values(WORKOUTS).forEach((p) => { if (!p.rest) p.exercises.forEach((e) => { if (!m[e.id] || !e.bonus) m[e.id] = m[e.id] && e.bonus ? m[e.id] : (m[e.id] || e.name); }); });
   return m;
 })();
 

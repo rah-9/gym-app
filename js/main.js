@@ -1,6 +1,6 @@
 /* App start-up and all tap/typing handlers. */
 import { S, save, backupNow, checkBackupSchedule, autoRestore, restoreLatest, importBackup, exportBackup, wipeAll, requestPersistentStorage } from './store.js';
-import { planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct } from './plan.js';
+import { planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct, streak, monthStats } from './plan.js';
 import { reportData, reportText, docReport, pdfReport } from './report.js';
 import { ui, render, stepsNote } from './views.js';
 import { startRest, addRest, setRestEnd, stopRest } from './timer.js';
@@ -17,9 +17,97 @@ function pushProgress() {
   notify.workoutProgress({ title: p.rest ? 'Rest day' : p.short + ' day', done: st.done, total: st.total, pct: st.pct, next: nx && nx.name });
 }
 
-function celebrate() {
-  const st = dayStats(ui.selDate);
-  if (st.pct === 100) toast(planFor(ui.selDate).rest ? 'Rest day done.' : 'Workout complete. Eat your protein.');
+// Feedback after every tick, and a full celebration the first time a day is finished.
+const CHEERS = [
+  'You showed up and finished it. That is how bodies change.',
+  'Every rep today was a vote for the person you are becoming.',
+  'Done. Future you is already thankful.',
+  'Consistency beats intensity, and you just proved it.',
+  'Another brick in the wall. Keep stacking.'
+];
+const MILESTONES = [3, 7, 14, 21, 30, 50, 75, 100, 150, 200, 365];
+
+function celebrate(justTicked) {
+  const k = ui.selDate, st = dayStats(k), p = planFor(k);
+  if (st.pct < 100) {
+    if (justTicked && !p.rest) toast('Nice. ' + st.done + ' of ' + st.total + ' done.');
+    return;
+  }
+  const d = dayWrite(k);
+  if (d.celebrated) { if (justTicked) toast(p.rest ? 'Rest day done.' : 'Workout complete.'); return; }
+  d.celebrated = true; save();
+  showCelebration(k, st, p);
+}
+
+function showCelebration(k, st, p) {
+  const sk = streak(), m = monthStats(k);
+  const milestone = !p.rest && MILESTONES.includes(sk) ? sk : 0;
+  const line = p.rest ? 'Recovery is part of the plan. Muscles grow on rest days.' : CHEERS[Math.floor(Math.random() * CHEERS.length)];
+  const el = document.createElement('div');
+  el.className = 'celebrate';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-label', 'Workout complete');
+  el.innerHTML = '<canvas class="confetti" aria-hidden="true"></canvas>' +
+    '<div class="cel-card">' +
+    '<div class="cel-check" aria-hidden="true"><svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M15 27 l7 7 l15 -16"/></svg></div>' +
+    '<h2 class="cel-title">' + (p.rest ? 'Rest day done' : 'Workout complete') + '</h2>' +
+    (milestone ? '<div class="cel-milestone">' + milestone + ' day streak</div>' : '') +
+    '<p class="cel-line">' + line + '</p>' +
+    (p.rest ? '' : '<div class="cel-stats">' +
+      '<div><b>' + st.done + '</b><span>items done</span></div>' +
+      '<div><b>' + st.sets + '</b><span>sets</span></div>' +
+      '<div><b>' + sk + '</b><span>day streak</span></div>' +
+      '<div><b>' + m.worked + '</b><span>days in ' + m.name + '</span></div></div>') +
+    (p.rest ? '' : '<p class="cel-tip">Refuel with protein within the next hour.</p>') +
+    '<div class="cel-actions"><button type="button" class="primary" data-cel="close">Keep going</button>' +
+    '<button type="button" class="ghost" data-cel="report">See my week</button></div></div>';
+  document.body.appendChild(el);
+  try { if (navigator.vibrate) navigator.vibrate([30, 40, 30, 40, 140]); } catch (e) { /* ignore */ }
+  requestAnimationFrame(() => el.classList.add('show'));
+  const stopConfetti = confetti(el.querySelector('canvas'));
+  const close = (go) => {
+    stopConfetti(); el.classList.remove('show');
+    setTimeout(() => el.remove(), 250);
+    if (go) { ui.view = 'report'; ui.reportWs = weekStartOf(k); render(); top(); }
+  };
+  el.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-cel]');
+    if (b) close(b.dataset.cel === 'report');
+  });
+}
+
+// Light confetti on a canvas: mint, teal, gold and white. Skipped when the phone asks for reduced motion.
+function confetti(canvas) {
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return () => {};
+  const ctx = canvas.getContext('2d'), dpr = window.devicePixelRatio || 1;
+  const W = canvas.width = innerWidth * dpr, H = canvas.height = innerHeight * dpr;
+  const colors = ['#3DDC97', '#7CF0C0', '#2BB8D9', '#E9C46A', '#F4F7F6'];
+  const parts = Array.from({ length: 130 }, () => ({
+    x: W / 2 + (Math.random() - 0.5) * W * 0.3, y: H * 0.42,
+    vx: (Math.random() - 0.5) * 16 * dpr, vy: (-Math.random() * 15 - 6) * dpr,
+    w: (5 + Math.random() * 5) * dpr, h: (8 + Math.random() * 6) * dpr,
+    r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3, c: colors[(Math.random() * colors.length) | 0]
+  }));
+  let raf = 0, t0 = performance.now(), live = true;
+  const step = (t) => {
+    if (!live) return;
+    const age = (t - t0) / 1000;
+    ctx.clearRect(0, 0, W, H);
+    parts.forEach((q) => {
+      q.vy += 0.42 * dpr; q.vx *= 0.99; q.x += q.vx; q.y += q.vy; q.r += q.vr;
+      ctx.save(); ctx.globalAlpha = Math.max(0, 1 - age / 3.2); ctx.translate(q.x, q.y); ctx.rotate(q.r);
+      ctx.fillStyle = q.c; ctx.fillRect(-q.w / 2, -q.h / 2, q.w, q.h); ctx.restore();
+    });
+    if (age < 3.4) raf = requestAnimationFrame(step); else ctx.clearRect(0, 0, W, H);
+  };
+  raf = requestAnimationFrame(step);
+  return () => { live = false; cancelAnimationFrame(raf); };
+}
+
+function markJustDone(id, on) {
+  if (!on) return;
+  ui.justDone = id;
+  setTimeout(() => { if (ui.justDone === id) ui.justDone = null; }, 700);
 }
 
 function toggleDone(id) {
@@ -31,7 +119,8 @@ function toggleDone(id) {
     if (d.done[id]) { if (!d.sets[id] || !d.sets[id].some(Boolean)) d.sets[id] = Array(e.sets).fill(true); }
     else delete d.sets[id];
   }
-  save(); render(); pushProgress(); celebrate();
+  markJustDone(id, d.done[id]);
+  save(); render(); pushProgress(); celebrate(d.done[id]);
 }
 
 function toggleSet(id, i) {
@@ -44,9 +133,10 @@ function toggleSet(id, i) {
   d.sets[id] = arr;
   const all = arr.every(Boolean);
   d.done[id] = all;
+  markJustDone(id, all);
   save(); render(); pushProgress();
   if (arr[i] && !all && ex.rest) startRest(ex.rest, ex.name);
-  if (all) celebrate();
+  if (all) celebrate(true);
 }
 
 function notifyOn() {
