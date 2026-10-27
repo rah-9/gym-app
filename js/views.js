@@ -4,7 +4,7 @@ import { S } from './store.js';
 import {
   planFor, workoutKeyFor, schedule, dayRead, dayStats, dayStatus, hasProgress, mainExercises, bonusExercises,
   weightHint, musclesFor, nextUp, programWeek, counts, stepsPct, STEP_GOAL, STATUS_LABEL, WEEK_ORDER,
-  streak, monthStats, lastNoteFor, sessionMinutes, bestKg, requiredItems, EX_NAMES
+  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, WATER_GOAL
 } from './plan.js';
 import { reportData, bestLabel } from './report.js';
 import * as notify from './notify.js';
@@ -254,8 +254,9 @@ function renderToday() {
   } else {
     const nx = nextUp(k);
     const nextId = nx && k === today ? nx.id : null;
-    const ln = lastNoteFor(k);
-    if (ln) body += '<div class="memo"><span class="memo-h">Your note from last ' + esc(p.short) + ' day, ' + DAY_SHORT[dow(ln.k)] + ' ' + fmt(ln.k) + '</span><p>' + esc(ln.note) + '</p></div>';
+    notesForDay(k).forEach((ln) => {
+      body += '<div class="memo"><span class="memo-h">Note from ' + DAY_SHORT[dow(ln.k)] + ' ' + fmt(ln.k) + ' (' + esc(planFor(ln.k).short) + ')</span><p>' + esc(ln.note) + '</p></div>';
+    });
     body += '<h2>Workout <span class="h-note">top to bottom, tap a name for tips</span></h2><ul class="list">' +
       mainExercises(p).map((e) => exerciseCard(e, d, false, e.id === nextId)).join('') + '</ul>';
     body += '<h2>Bonus <span class="h-note">if your body allows today</span></h2>' +
@@ -267,7 +268,15 @@ function renderToday() {
   body += '<h2>Daily habits</h2><div class="card stepscard"><div class="steps-top"><label class="name" for="steps-in">Steps today</label>' +
     '<label class="kg big"><input type="number" inputmode="numeric" min="0" max="100000" step="100" id="steps-in" data-steps="1" value="' + esc(steps) + '" placeholder="0"><span>steps</span></label></div>' +
     '<div class="bar"><span id="steps-bar" style="width:' + stepsPct(steps) + '%"></span></div><div class="tip" id="steps-note">' + stepsNote(steps) + '</div></div>';
-  body += '<div class="habits">' + HABITS.filter((h) => h.id !== 'steps').map((h) => {
+  const water = d.water || 0;
+  body += '<div class="card watercard"><div class="steps-top"><span class="name">Water</span>' +
+    '<span class="water-ctl"><button type="button" class="wbtn" data-action="water" data-n="-1" aria-label="One glass less">&#8722;</button>' +
+    '<b><span id="water-n">' + water + '</span>/' + WATER_GOAL + '</b>' +
+    '<button type="button" class="wbtn plus" data-action="water" data-n="1" aria-label="One more glass">+</button></span></div>' +
+    '<div class="glasses">' + Array.from({ length: WATER_GOAL }, (_, i) => '<i class="' + (i < water ? 'on' : '') + '"></i>').join('') + '</div>' +
+    '<div class="tip">' + (water >= WATER_GOAL ? 'Goal hit, 3 litres. Nice.' : (WATER_GOAL - water) + ' glasses of 250 ml to go.') + '</div></div>';
+  if (k === today) body += bodyCard();
+  body += '<div class="habits">' + HABITS.filter((h) => h.id !== 'steps' && h.id !== 'water').map((h) => {
     const on = !!d.habits[h.id];
     return '<button type="button" class="habit' + (on ? ' on' : '') + '" data-action="habit" data-id="' + esc(h.id) + '" role="checkbox" aria-checked="' + on + '">' +
       '<span class="hb-tick" aria-hidden="true"></span><span>' + esc(h.name) + '</span></button>';
@@ -277,8 +286,12 @@ function renderToday() {
   body += '<details class="diet"' + (S.settings.dietOpen ? ' open' : '') + '><summary data-action="diet-toggle"><span>Diet plan <span class="h-note">optional, veg ghar ka khana</span></span><span class="muted">' + mealsDone + '/' + MEALS.length + '</span></summary>' +
     '<ul class="list compact">' + MEALS.map((m) => simpleCard('meal', m.id, !!d.meals[m.id], m.name, m.detail)).join('') + '</ul></details>';
 
-  body += '<h2>Notes <span class="h-note">shown again next ' + esc(p.short) + ' day</span></h2><textarea data-note="1" rows="3" placeholder="How did it feel? Any pain? What to change next time?" aria-label="Notes">' + esc(d.note || '') + '</textarea>' +
-    '<div class="note-status" id="note-status">' + noteStatus(d) + '</div>';
+  const nextK = nextSameWorkout(k), mode = d.noteFor || 'next';
+  const opt = (v, label) => '<button type="button" class="seg' + (mode === v ? ' on' : '') + '" data-action="note-for" data-v="' + v + '">' + label + '</button>';
+  body += '<h2>Notes</h2><textarea data-note="1" rows="3" placeholder="How did it feel? Any pain? What to change next time?" aria-label="Notes">' + esc(d.note || '') + '</textarea>' +
+    '<div class="note-row"><span class="note-status" id="note-status">' + noteStatus(d) + '</span>' +
+    '<span class="segs" role="group" aria-label="Show this note again"><span class="segs-l">Remind</span>' +
+    opt('next', nextK ? 'Next ' + esc(p.short) + ', ' + DAY_SHORT[dow(nextK)] : 'Next time') + opt('tomorrow', 'Tomorrow') + opt('off', 'Off') + '</span></div>';
   if (k !== today) body += '<button type="button" class="ghost wide" data-action="pick" data-k="' + today + '">Back to today</button>';
 
   return weekStrip(k) + (k === today ? notifyPrompt() + reminderHtml() : '') + hero(k) + body;
@@ -338,8 +351,7 @@ function renderReport() {
     '<h2>Day by day</h2><div class="tablewrap"><table class="days"><thead><tr><th>Day</th><th>Workout</th><th class="num">Done</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<h2>Missed</h2>' + missed + todo +
     '<h2>Weights</h2>' + weights +
-    '<h2>Body weight</h2><div class="weigh"><label class="kg big"><input type="number" inputmode="decimal" min="30" max="250" step="0.1" id="bodykg" value="' + esc(bodyNow) + '" placeholder="111" aria-label="Body weight"><span>kg today</span></label>' +
-    '<button type="button" class="primary" data-action="save-body">Save</button></div>' + bodyList + bodyChange +
+    bodySection() +
     '<h2>Save this report</h2><div class="saverow">' +
     '<button type="button" class="primary" data-action="pdf-report">PDF</button>' +
     '<button type="button" class="ghost" data-action="doc-report">Word</button>' +
@@ -366,8 +378,8 @@ function monthCalendar(k) {
 }
 
 export function noteStatus(d) {
-  if (!(d.note || '').trim()) return 'Saved on this phone as you type. It comes back as a reminder next time.';
-  return 'Saved' + (d.noteAt ? ' at ' + clockTime(d.noteAt) : '') + ' on this phone. You will see it again next time.';
+  if (!(d.note || '').trim()) return 'Saves as you type';
+  return 'Saved' + (d.noteAt ? ' at ' + clockTime(d.noteAt) : '');
 }
 
 // Day detail sheet, opened from the Report calendar.
@@ -400,7 +412,78 @@ export function daySheetHtml(k) {
     '<button type="button" class="ghost" data-sheet="close">Close</button></div></div>';
 }
 
+/* ---------- body weight ---------- */
+const kg1 = (v) => (Math.round(v * 10) / 10).toFixed(1);
+
+// Small weigh-in card on Today.
+function bodyCard() {
+  const b = bodyStats(), logged = S.body[todayKey()];
+  const line = b.current == null ? 'Log your weight to start tracking.'
+    : b.target == null ? 'Now ' + kg1(b.current) + ' kg. Set a target in the Report tab.'
+    : b.toGo > 0 ? kg1(b.toGo) + ' kg to your goal of ' + kg1(b.target) + ' kg' + (b.lost > 0 ? ', ' + kg1(b.lost) + ' kg down so far' : '') + '.'
+    : 'Goal of ' + kg1(b.target) + ' kg reached. Set a new one.';
+  return '<div class="card bodycard"><div class="steps-top"><span class="name">Body weight</span>' +
+    '<span class="body-in"><label class="kg"><input type="number" inputmode="decimal" min="30" max="250" step="0.1" id="bodykg" value="' + esc(logged || '') + '" placeholder="' + (b.current ? kg1(b.current) : '0') + '" aria-label="Weight today"><span>kg</span></label>' +
+    '<button type="button" class="chip" data-action="save-body">' + (logged ? 'Update' : 'Log') + '</button></span></div>' +
+    (b.pct != null ? '<div class="bar"><span style="width:' + b.pct + '%"></span></div>' : '') +
+    '<div class="tip">' + line + '</div></div>';
+}
+
+// Line chart of weigh-ins with the target as a dashed line.
+function weightChart(b) {
+  const pts = b.entries.slice(-16);
+  if (pts.length < 2) return '<p class="muted small">The chart appears after your second weigh-in.</p>';
+  const W = 320, H = 130, P = 26;
+  const vals = pts.map((p) => p.kg).concat(b.target != null ? [b.target] : []);
+  let lo = Math.min.apply(null, vals) - 1, hi = Math.max.apply(null, vals) + 1;
+  const x = (i) => P + i * (W - P - 8) / (pts.length - 1), y = (v) => 8 + (hi - v) / (hi - lo) * (H - 28);
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.kg).toFixed(1)).join(' ');
+  const area = line + ' L' + x(pts.length - 1).toFixed(1) + ' ' + (H - 20) + ' L' + x(0).toFixed(1) + ' ' + (H - 20) + ' Z';
+  const tgt = b.target != null ? '<line x1="' + P + '" x2="' + (W - 8) + '" y1="' + y(b.target).toFixed(1) + '" y2="' + y(b.target).toFixed(1) + '" class="wc-target"/>' +
+    '<text x="' + (W - 8) + '" y="' + (y(b.target) - 4).toFixed(1) + '" text-anchor="end" class="wc-tl">target ' + kg1(b.target) + '</text>' : '';
+  const dots = pts.map((p, i) => '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.kg).toFixed(1) + '" r="' + (i === pts.length - 1 ? 4 : 2.5) + '" class="wc-dot' + (i === pts.length - 1 ? ' last' : '') + '"/>').join('');
+  return '<svg class="wchart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Weight trend">' +
+    '<defs><linearGradient id="wcFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9a8ff" stop-opacity="0.35"/><stop offset="1" stop-color="#b9a8ff" stop-opacity="0"/></linearGradient></defs>' +
+    '<text x="2" y="' + (y(hi - 1) + 4).toFixed(1) + '" class="wc-ax">' + kg1(hi - 1) + '</text><text x="2" y="' + (y(lo + 1) + 4).toFixed(1) + '" class="wc-ax">' + kg1(lo + 1) + '</text>' +
+    tgt + '<path d="' + area + '" fill="url(#wcFill)"/><path d="' + line + '" class="wc-line"/>' + dots +
+    '<text x="' + P + '" y="' + (H - 4) + '" class="wc-ax">' + fmt(pts[0].k) + '</text><text x="' + (W - 8) + '" y="' + (H - 4) + '" text-anchor="end" class="wc-ax">' + fmt(pts[pts.length - 1].k) + '</text></svg>';
+}
+
+// Full body weight section for the Report tab.
+export function bodySection() {
+  const b = bodyStats(), logged = S.body[todayKey()];
+  const tiles = b.current == null ? '' : '<div class="bw-tiles">' +
+    '<div><span>Start</span><b>' + kg1(b.start) + '</b></div>' +
+    '<div><span>Now</span><b>' + kg1(b.current) + '</b></div>' +
+    '<div><span>Target</span><b>' + (b.target != null ? kg1(b.target) : '-') + '</b></div>' +
+    '<div class="hl"><span>' + (b.lost >= 0 ? 'Lost' : 'Gained') + '</span><b>' + kg1(Math.abs(b.lost)) + '</b></div></div>';
+  let pace = '';
+  if (b.current != null && b.target != null && b.toGo > 0) {
+    pace = '<p class="bw-pace">' + kg1(b.toGo) + ' kg to go' +
+      (b.rate > 0 ? ', losing ' + kg1(b.rate) + ' kg a week' + (b.eta ? '. At this pace you reach ' + kg1(b.target) + ' kg around ' + fmt(b.eta) + ' ' + fromKey(b.eta).getFullYear() : '') + '.' : '. Weigh in once a week to see your pace and goal date.') + '</p>' +
+      '<p class="muted small">A safe pace is 0.5 to 1 kg a week. Faster usually means losing muscle.</p>';
+  }
+  return '<h2>Body weight</h2><div class="card bwcard">' + tiles +
+    (b.pct != null ? '<div class="bw-prog"><div class="bar"><span style="width:' + b.pct + '%"></span></div><span>' + b.pct + '% of the way</span></div>' : '') +
+    (b.entries.length ? weightChart(b) : '') + pace +
+    '<div class="bw-form"><label class="kg big"><input type="number" inputmode="decimal" min="30" max="250" step="0.1" id="bodykg" value="' + esc(logged || '') + '" placeholder="' + (b.current ? kg1(b.current) : '111') + '" aria-label="Weight today"><span>kg today</span></label>' +
+    '<button type="button" class="primary" data-action="save-body">Save</button></div>' +
+    '<div class="bw-form"><label class="kg big"><input type="number" inputmode="decimal" min="30" max="250" step="0.5" id="targetkg" value="' + esc(S.settings.targetKg || '') + '" placeholder="95" aria-label="Target weight"><span>kg target</span></label>' +
+    '<button type="button" class="ghost" data-action="save-target">Set target</button></div></div>';
+}
+
 /* ---------- Plan ---------- */
+function remindSection() {
+  const r = S.settings.remind || {}, w = r.water == null ? 30 : r.water, steps = r.steps !== false;
+  const seg = (v, label) => '<button type="button" class="seg' + (w === v ? ' on' : '') + '" data-action="remind-water" data-v="' + v + '">' + label + '</button>';
+  return '<h2>Reminders</h2><div class="card panel">' +
+    '<div class="rem-row"><div><b>Drink water</b><div class="muted small">7 AM to 10 PM, stops at ' + WATER_GOAL + ' glasses</div></div>' +
+    '<span class="segs">' + seg(0, 'Off') + seg(30, '30 min') + seg(60, '1 h') + seg(90, '1.5 h') + '</span></div>' +
+    '<div class="rem-row"><div><b>Walk for steps</b><div class="muted small">Every 2 hours from 5 PM until ' + num(STEP_GOAL) + ' steps</div></div>' +
+    '<button type="button" class="switch' + (steps ? ' on' : '') + '" data-action="remind-steps" role="switch" aria-checked="' + steps + '" aria-label="Steps reminder"></button></div>' +
+    '<p class="muted small">These come as phone notifications while the app is open or running in the background' + (notify.enabled() ? '' : '. Turn on notifications below to get them in your notification panel') + '. If the app is fully closed they cannot fire; that needs a push server.</p></div>';
+}
+
 function notifySection() {
   const perm = notify.permission();
   let status, btns = '';
@@ -491,5 +574,5 @@ function renderPlan() {
     '<li>Hit the top reps on every set, then add the smallest weight jump next time.</li>' +
     '<li>Never lock knees on leg press. Keep your back flat on every row and pulldown.</li>' +
     '<li>Every 6 to 8 weeks, one easy week at half the sets.</li></ul>' + goalLegend() +
-    notifySection() + dataSection();
+    remindSection() + notifySection() + dataSection();
 }

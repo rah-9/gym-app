@@ -1,12 +1,12 @@
 /* App start-up and all tap/typing handlers. */
 import { S, save, backupNow, checkBackupSchedule, autoRestore, restoreLatest, importBackup, exportBackup, wipeAll, requestPersistentStorage } from './store.js';
-import { planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct, streak, monthStats, bestKg, sessionMinutes, EX_NAMES } from './plan.js';
+import { planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct, streak, monthStats, bestKg, sessionMinutes, EX_NAMES, WATER_GOAL, noteTarget } from './plan.js';
 import { reportData, reportText, docReport, pdfReport } from './report.js';
 import { ui, render, stepsNote, daySheetHtml, noteStatus, sessionLabel } from './views.js';
 import { startRest, addRest, setRestEnd, stopRest } from './timer.js';
 import { initLock, isUnlocked, showLock, lockNow, recordActivity } from './lock.js';
 import * as notify from './notify.js';
-import { $, todayKey, addDays, weekStartOf, toast, download } from './util.js';
+import { $, todayKey, addDays, weekStartOf, toast, download, fmt, dow, DAY_NAMES } from './util.js';
 
 const top = () => window.scrollTo(0, 0);
 
@@ -202,6 +202,27 @@ const ACTIONS = {
     if (isNaN(v) || v < 30 || v > 250) { toast('Enter your weight in kg, like 111.'); return; }
     S.body[todayKey()] = Math.round(v * 10) / 10; save(); render(); toast('Weight saved.');
   },
+  'save-target': () => {
+    const v = parseFloat($('#targetkg').value);
+    if (isNaN(v) || v < 30 || v > 250) { toast('Enter a target in kg, like 95.'); return; }
+    S.settings.targetKg = Math.round(v * 10) / 10; save(); render(); toast('Target set to ' + S.settings.targetKg + ' kg.');
+  },
+  water: (el) => {
+    const d = dayWrite(ui.selDate);
+    d.water = Math.max(0, Math.min(20, (d.water || 0) + (+el.dataset.n)));
+    d.waterAt = Date.now();
+    d.habits.water = d.water >= WATER_GOAL;
+    save(); render();
+    if (+el.dataset.n > 0 && d.water === WATER_GOAL) toast('3 litres done. Water goal hit.');
+  },
+  'note-for': (el) => {
+    const d = dayWrite(ui.selDate);
+    d.noteFor = el.dataset.v; save(); render();
+    const t = noteTarget(ui.selDate);
+    toast(el.dataset.v === 'off' ? 'This note will not come back.' : t ? 'You will see this note on ' + DAY_NAMES[dow(t)] + ', ' + fmt(t) + '.' : 'Write a note first.');
+  },
+  'remind-water': (el) => { S.settings.remind = Object.assign({}, S.settings.remind, { water: +el.dataset.v }); save(); render(); },
+  'remind-steps': () => { const r = S.settings.remind || {}; S.settings.remind = Object.assign({}, r, { steps: r.steps === false }); save(); render(); },
   'copy-report': () => {
     const txt = reportText(reportData(ui.reportWs));
     const fallback = () => download('gym-report-' + ui.reportWs + '.txt', txt);
@@ -324,6 +345,36 @@ requestPersistentStorage();
 autoRestore().then((restored) => { if (restored && !$('#root').hidden) render(); });
 
 setInterval(() => { checkNewDay(); checkBackupSchedule(); }, 30000);
+
+/* ---------- reminders ----------
+   Water: every N minutes (default 30) between 7 AM and 10 PM until 12 glasses are logged.
+   Steps: every 2 hours from 5 PM until the step goal is reached.
+   They show in the notification panel when notifications are on, and as a toast in the app.
+   A web app can only run these while it is open or kept in the background; a fully closed app
+   would need a push server. */
+function nudge(tag, title, body) {
+  notify.show(tag, title, body, { silent: false, renotify: true, vibrate: [80, 40, 80] });
+  if (document.visibilityState === 'visible' && !$('#root').hidden) toast(body);
+}
+function remindTick() {
+  const r = S.settings.remind || {}, now = new Date(), h = now.getHours(), t = Date.now();
+  if (h < 7 || h >= 22) return;
+  const d = S.days[todayKey()] || {};
+  if (S.settings.lastWaterRemind == null) { S.settings.lastWaterRemind = t; S.settings.lastStepsRemind = t; save(); return; }
+  const wInt = r.water == null ? 30 : r.water;
+  const water = d.water || 0;
+  if (wInt > 0 && water < WATER_GOAL && t - Math.max(S.settings.lastWaterRemind || 0, d.waterAt || 0) >= wInt * 60000) {
+    S.settings.lastWaterRemind = t; save();
+    nudge('water', 'Drink water', 'Time for a glass of water. ' + water + ' of ' + WATER_GOAL + ' glasses today.');
+  }
+  const steps = parseInt(d.steps, 10) || 0;
+  if (r.steps !== false && h >= 17 && steps < STEP_GOAL && t - (S.settings.lastStepsRemind || 0) >= 120 * 60000) {
+    S.settings.lastStepsRemind = t; save();
+    nudge('steps', 'Time to walk', (steps ? steps.toLocaleString('en-IN') + ' of ' + STEP_GOAL.toLocaleString('en-IN') + ' steps. ' : 'Steps not logged yet. ') + 'A 15 minute walk adds about 1,800 steps.');
+  }
+}
+setInterval(remindTick, 60000);
+setTimeout(remindTick, 8000);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   if (!isUnlocked()) { showLock(); return; }

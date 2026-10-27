@@ -1,6 +1,6 @@
 /* Weekly report: numbers, plain text, Word (.doc) and PDF downloads. */
 import { S } from './store.js';
-import { planFor, dayRead, dayStats, dayStatus, counts, streak, bestStreak, monthStats, totalWorkoutDays, workedOut, EX_NAMES, STATUS_LABEL, STEP_GOAL } from './plan.js';
+import { planFor, dayRead, dayStats, dayStatus, counts, streak, bestStreak, monthStats, totalWorkoutDays, workedOut, EX_NAMES, STATUS_LABEL, STEP_GOAL, bodyStats, sessionMinutes } from './plan.js';
 import { esc, fmt, fromKey, addDays, todayKey, weekDays, dow, num, download, toast, DAY_NAMES, DAY_SHORT } from './util.js';
 
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
@@ -60,7 +60,7 @@ export function reportData(ws) {
   return {
     ws: ws, we: addDays(ws, 6), rows: rows, missed: missed, todo: todo, score: score,
     total: total, done: done, trained: trained, fullDays: fullDays, trainDays: trainDays, sets: sets, bonus: bonus,
-    asOf: asOf, month: monthStats(asOf), best: bestStreak(asOf), totalDays: totalWorkoutDays(),
+    asOf: asOf, month: monthStats(asOf), best: bestStreak(asOf), totalDays: totalWorkoutDays(), bodyStats: bodyStats(asOf),
     habitsPct: habitsTotal ? Math.round(habitsDone / habitsTotal * 100) : 0,
     mealsPct: mealsTotal ? Math.round(mealsDone / mealsTotal * 100) : 0,
     stepsTotal: stepsTotal, stepsDays: stepsDays, stepsGoal: stepsGoal,
@@ -142,25 +142,96 @@ function weightChange(w) {
   return (ch > 0 ? '+' : '') + ch + ' kg';
 }
 
+/* ---------- shared report pieces ---------- */
+// Print colours: white page, near-black header, soft violet accent, status tints.
+const PC = {
+  ink: '#16161a', muted: '#6f6f7a', line: '#e6e6ec', band: '#111114', bandInk: '#ffffff', bandMuted: '#b9b9c4',
+  accent: '#7c6cf0', accentSoft: '#efecff', tile: '#f6f6f9', gold: '#b8860b', goldSoft: '#fdf4dc',
+  done: '#eeebff', doneBorder: '#7c6cf0', partial: '#fff3da', partialBorder: '#e0a23a',
+  missed: '#ffe7ec', missedBorder: '#e0708a', idle: '#f4f4f6', idleBorder: '#d9d9e0', up: '#5b4bd6', down: '#c2476a'
+};
+const STATUS_FILL = {
+  done: [PC.done, PC.doneBorder], partial: [PC.partial, PC.partialBorder], today: [PC.partial, PC.partialBorder],
+  missed: [PC.missed, PC.missedBorder]
+};
+const statusFill = (st) => STATUS_FILL[st] || [PC.idle, PC.idleBorder];
+const k1 = (v) => (Math.round(v * 10) / 10).toFixed(1);
+
+function kpis(r) {
+  return [
+    ['Workout days', r.trained + ' / ' + r.trainDays, r.fullDays + ' fully finished'],
+    ['Streak', String(r.streak), 'best ' + (r.best.days || 0) + ' days'],
+    [r.month.name, String(r.month.worked), 'workout days'],
+    ['Score', r.score + '%', r.done + ' of ' + r.total + ' items']
+  ];
+}
+function kpis2(r) {
+  return [
+    ['Sets', String(r.sets), r.bonus + ' bonus exercises'],
+    ['Steps a day', r.stepsDays ? num(r.stepsAvg) : '-', 'goal hit ' + r.stepsGoal + ' days'],
+    ['Habits', r.habitsPct + '%', 'water, sleep, no junk'],
+    ['Total', String(r.totalDays), 'workout days ever']
+  ];
+}
+function bodySummary(b) {
+  if (!b || b.current == null) return null;
+  return {
+    rows: [['Start', k1(b.start) + ' kg'], ['Now', k1(b.current) + ' kg'], ['Target', b.target != null ? k1(b.target) + ' kg' : 'not set'],
+      [b.lost >= 0 ? 'Lost' : 'Gained', k1(Math.abs(b.lost)) + ' kg']],
+    pct: b.pct,
+    line: b.target != null && b.toGo > 0
+      ? k1(b.toGo) + ' kg to go' + (b.rate > 0 ? ', losing ' + k1(b.rate) + ' kg a week' + (b.eta ? ', goal around ' + fmt(b.eta) + ' ' + fromKey(b.eta).getFullYear() : '') : '') + '.'
+      : b.target != null ? 'Target reached.' : 'Set a target weight in the app to see progress.'
+  };
+}
+function notesOf(r) { return weekDays(r.ws).filter((k) => (dayRead(k).note || '').trim()); }
+
+/* ---------- Word (.doc): styled HTML that Word opens with colours and tables ---------- */
 export function docReport(r) {
-  let yr = fromKey(r.ws).getFullYear();
-  let cell = function (v) { return '<td>' + esc(v) + '</td>'; };
+  const yr = fromKey(r.ws).getFullYear();
+  const td = (html, st) => '<td style="' + (st || '') + '">' + html + '</td>';
+  const tile = (t, bg) => td('<div style="font-size:8.5pt;color:' + PC.muted + ';text-transform:uppercase;letter-spacing:1px">' + esc(t[0]) + '</div>' +
+    '<div style="font-size:22pt;font-weight:bold;color:' + PC.ink + ';margin:2pt 0">' + esc(t[1]) + '</div><div style="font-size:8.5pt;color:' + PC.muted + '">' + esc(t[2]) + '</div>',
+    'background:' + (bg || PC.tile) + ';padding:10pt;border:1px solid #ffffff;width:25%;vertical-align:top');
+  const h2 = (t) => '<h2 style="font-size:13pt;color:' + PC.ink + ';margin:18pt 0 6pt;border-bottom:2px solid ' + PC.accent + ';padding-bottom:3pt">' + esc(t) + '</h2>';
   let h = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>Gym report</title>' +
-    '<style>body{font-family:Calibri,Arial,sans-serif;color:#1f1f1f;font-size:11pt}h1{font-size:22pt;margin:0 0 2pt}h2{font-size:13pt;margin:18pt 0 6pt}' +
-    '.sub{color:#6b6f72;margin:0 0 10pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #d5d8dc;padding:4pt 6pt;font-size:10.5pt;text-align:left;vertical-align:top}th{background:#f1f3f4}.v{background:#f6f8fc;padding:8pt;border:1px solid #e1e4e8}</style></head><body>';
-  h += '<h1>Gym report</h1><p class="sub">' + fmt(r.ws) + ' to ' + fmt(r.we) + ' ' + yr + '</p><p class="v">' + esc(r.verdict) + '</p>';
-  h += '<h2>Summary</h2><table>' + summaryRows(r).map(function (x) { return '<tr><th>' + esc(x[0]) + '</th>' + cell(x[1]) + '</tr>'; }).join('') + '</table>';
-  h += '<h2>Day by day</h2><table><tr><th>Day</th><th>Focus</th><th>Items</th><th>Steps</th><th>Status</th></tr>' + r.rows.map(function (row) {
-    return '<tr>' + cell(DAY_SHORT[dow(row.k)] + ' ' + fmt(row.k)) + cell(row.p.focus) + cell(row.st.done + '/' + row.st.total) + cell(row.st.steps ? num(row.st.steps) : '-') + cell(STATUS_LABEL[row.status]) + '</tr>';
-  }).join('') + '</table>';
-  h += '<h2>Missed</h2>' + (r.missed.length ? '<ul>' + r.missed.map(function (m) { return '<li><b>' + DAY_NAMES[dow(m.k)] + ':</b> ' + esc(m.items.join(', ')) + '</li>'; }).join('') + '</ul>' : '<p>Nothing missed.</p>');
-  h += '<h2>Weights</h2>' + (r.weights.length ? '<table><tr><th>Exercise</th><th>This week</th><th>Last week</th><th>Change</th></tr>' + r.weights.map(function (w) {
-    return '<tr>' + cell(w.name) + cell(w.now + ' kg') + cell(w.last != null ? w.last + ' kg' : '-') + cell(weightChange(w)) + '</tr>';
-  }).join('') + '</table>' : '<p>No weights logged.</p>');
-  h += '<h2>Body weight</h2><p>' + esc(bodyLine(r)) + '</p>';
-  let notes = weekDays(r.ws).filter(function (k) { return (dayRead(k).note || '').trim(); });
-  if (notes.length) h += '<h2>Notes</h2><ul>' + notes.map(function (k) { return '<li><b>' + DAY_SHORT[dow(k)] + ':</b> ' + esc(dayRead(k).note) + '</li>'; }).join('') + '</ul>';
-  h += '</body></html>';
+    '<style>body{font-family:Calibri,Segoe UI,Arial,sans-serif;color:' + PC.ink + ';font-size:10.5pt}table{border-collapse:collapse;width:100%}' +
+    'th{background:' + PC.tile + ';color:' + PC.muted + ';font-size:9pt;text-align:left;padding:5pt 7pt;border-bottom:1px solid ' + PC.line + '}' +
+    '.t td{padding:5pt 7pt;border-bottom:1px solid ' + PC.line + ';font-size:10pt}</style></head><body>';
+  // header band
+  h += '<table><tr>' + td('<div style="font-size:9pt;letter-spacing:2px;color:#b9a8ff">WEEKLY GYM REPORT</div>' +
+    '<div style="font-size:24pt;font-weight:bold;color:#ffffff;margin:3pt 0">' + fmt(r.ws) + ' to ' + fmt(r.we) + ' ' + yr + '</div>' +
+    '<div style="font-size:11pt;color:' + PC.bandMuted + '">' + esc(r.verdict) + '</div>', 'background:' + PC.band + ';padding:16pt 18pt') + '</tr></table>';
+  h += '<br><table><tr>' + kpis(r).map((t, i) => tile(t, i === 1 ? PC.goldSoft : PC.accentSoft)).join('') + '</tr></table>';
+  h += '<table><tr>' + kpis2(r).map((t) => tile(t)).join('') + '</tr></table>';
+  // week at a glance
+  h += h2('Week at a glance') + '<table><tr>' + r.rows.map((row) => {
+    const f = statusFill(row.status);
+    return td('<div style="font-size:8.5pt;color:' + PC.muted + '">' + DAY_SHORT[dow(row.k)] + ' ' + fmt(row.k) + '</div>' +
+      '<div style="font-size:11pt;font-weight:bold;margin:2pt 0">' + esc(row.p.short) + '</div>' +
+      '<div style="font-size:9pt">' + (row.p.rest ? 'Rest' : row.st.done + '/' + row.st.total) + '</div>' +
+      '<div style="font-size:8.5pt;color:' + f[1] + ';font-weight:bold">' + esc(STATUS_LABEL[row.status] || '') + '</div>',
+      'background:' + f[0] + ';border-top:3px solid ' + f[1] + ';padding:6pt;width:14%;vertical-align:top;border-left:2px solid #ffffff');
+  }).join('') + '</tr></table>';
+  // body weight
+  const bs = bodySummary(r.bodyStats);
+  if (bs) {
+    h += h2('Body weight') + '<table><tr>' + bs.rows.map((x, i) => td('<div style="font-size:8.5pt;color:' + PC.muted + '">' + x[0] + '</div><div style="font-size:15pt;font-weight:bold">' + x[1] + '</div>',
+      'background:' + (i === 3 ? PC.accentSoft : PC.tile) + ';padding:8pt;width:25%;border:1px solid #ffffff')).join('') + '</tr></table>';
+    if (bs.pct != null) h += '<table style="margin-top:6pt"><tr>' + td('', 'background:' + PC.accent + ';height:8pt;width:' + Math.max(1, bs.pct) + '%') + td('', 'background:' + PC.line + ';height:8pt') + '</tr></table>' +
+      '<p style="color:' + PC.muted + ';font-size:9.5pt;margin:4pt 0">' + bs.pct + '% of the way. ' + esc(bs.line) + '</p>';
+    else h += '<p style="color:' + PC.muted + '">' + esc(bs.line) + '</p>';
+  }
+  // weights
+  h += h2('Lifting weights') + (r.weights.length ? '<table class="t"><tr><th>Exercise</th><th>This week</th><th>Last week</th><th>Change</th></tr>' + r.weights.map((w, i) => {
+    const ch = weightChange(w), col = w.last == null ? PC.muted : w.now > w.last ? PC.up : w.now < w.last ? PC.down : PC.muted;
+    return '<tr' + (i % 2 ? ' style="background:#fafafc"' : '') + '><td>' + esc(w.name) + '</td><td><b>' + w.now + ' kg</b></td><td>' + (w.last != null ? w.last + ' kg' : '-') + '</td><td style="color:' + col + ';font-weight:bold">' + ch + '</td></tr>';
+  }).join('') + '</table>' : '<p style="color:' + PC.muted + '">No weights logged this week.</p>');
+  // missed
+  h += h2('Missed') + (r.missed.length ? r.missed.map((m) => '<p style="margin:3pt 0"><span style="background:' + PC.missed + ';color:' + PC.down + ';font-weight:bold;padding:1pt 6pt">' + DAY_SHORT[dow(m.k)] + '</span> ' + esc(m.items.join(', ')) + '</p>').join('') : '<p style="color:' + PC.muted + '">Nothing missed. Clean week.</p>');
+  const notes = notesOf(r);
+  if (notes.length) h += h2('Notes') + notes.map((k) => '<p style="margin:4pt 0;padding:6pt 8pt;background:' + PC.tile + ';border-left:3px solid ' + PC.accent + '"><b>' + DAY_SHORT[dow(k)] + ' ' + fmt(k) + ':</b> ' + esc(dayRead(k).note) + '</p>').join('');
+  h += '<p style="color:' + PC.muted + ';font-size:8.5pt;margin-top:18pt">Made with Gym log on ' + fmt(todayKey()) + '.</p></body></html>';
   download('gym-report-' + r.ws + '.doc', '﻿' + h, 'application/msword');
 }
 
@@ -179,66 +250,150 @@ function loadJsPdf() {
 export function pdfReport(r) {
   toast('Making PDF...');
   loadJsPdf().then(function () {
-    let doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'a4' });
-    let W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 48, y = M, CW = W - 2 * M;
-    let INK = '#1f1f1f', MUTED = '#6b6f72', LINE = '#e1e4e8';
-    function need(h) { if (y + h > H - M) { doc.addPage(); y = M; } }
-    function text(t, size, style, color) {
-      doc.setFont('helvetica', style || 'normal'); doc.setFontSize(size); doc.setTextColor(color || INK);
-      doc.splitTextToSize(String(t), CW).forEach(function (l) { need(size * 1.45); doc.text(l, M, y + size); y += size * 1.45; });
+    const doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'a4' });
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 40, CW = W - 2 * M;
+    let y = 0;
+    const font = (size, style, color) => { doc.setFont('helvetica', style || 'normal'); doc.setFontSize(size); doc.setTextColor(color || PC.ink); };
+    const need = (h) => { if (y + h > H - 50) { doc.addPage(); y = M; } };
+    const heading = (t) => {
+      y += 18; need(40);
+      font(12.5, 'bold'); doc.text(t, M, y + 12);
+      doc.setFillColor(PC.accent); doc.rect(M, y + 18, 26, 2.5, 'F');
+      y += 30;
+    };
+    const tile = (x, w, h, t, fill, big) => {
+      doc.setFillColor(fill || PC.tile); doc.roundedRect(x, y, w, h, 8, 8, 'F');
+      font(7.5, 'bold', PC.muted); doc.text(String(t[0]).toUpperCase(), x + 12, y + 18);
+      font(big || 22, 'bold', PC.ink); doc.text(String(t[1]), x + 12, y + 18 + (big || 22) + 2);
+      font(8, 'normal', PC.muted); doc.text(doc.splitTextToSize(String(t[2]), w - 24)[0] || '', x + 12, y + h - 12);
+    };
+
+    // Header band
+    doc.setFillColor(PC.band); doc.rect(0, 0, W, 128, 'F');
+    doc.setFillColor('#2a2540'); doc.circle(W - 40, 10, 90, 'F');
+    doc.setFillColor('#1c1a2b'); doc.circle(W - 120, 120, 60, 'F');
+    font(8.5, 'bold', '#b9a8ff'); doc.text('WEEKLY GYM REPORT', M, 40);
+    font(24, 'bold', PC.bandInk); doc.text(fmt(r.ws) + ' to ' + fmt(r.we) + ' ' + fromKey(r.ws).getFullYear(), M, 70);
+    font(10.5, 'normal', PC.bandMuted);
+    doc.splitTextToSize(r.verdict, CW - 40).slice(0, 2).forEach((l, i) => doc.text(l, M, 94 + i * 14));
+    y = 148;
+
+    // KPI tiles
+    const tw = (CW - 3 * 10) / 4;
+    kpis(r).forEach((t, i) => tile(M + i * (tw + 10), tw, 78, t, i === 1 ? PC.goldSoft : PC.accentSoft));
+    y += 88;
+    kpis2(r).forEach((t, i) => tile(M + i * (tw + 10), tw, 62, t, PC.tile, 16));
+    y += 62;
+
+    // Week at a glance
+    heading('Week at a glance');
+    const dw = (CW - 6 * 6) / 7;
+    r.rows.forEach((row, i) => {
+      const x = M + i * (dw + 6), f = statusFill(row.status);
+      doc.setFillColor(f[0]); doc.roundedRect(x, y, dw, 74, 7, 7, 'F');
+      doc.setFillColor(f[1]); doc.rect(x + 8, y, dw - 16, 3, 'F');
+      font(7.5, 'bold', PC.muted); doc.text(DAY_SHORT[dow(row.k)].toUpperCase() + ' ' + fromKey(row.k).getDate(), x + 8, y + 18);
+      font(10.5, 'bold', PC.ink); doc.text(row.p.short, x + 8, y + 34);
+      font(9, 'normal', PC.ink); doc.text(row.p.rest ? 'Rest' : row.st.done + ' / ' + row.st.total, x + 8, y + 49);
+      font(7.5, 'bold', f[1]); doc.text((STATUS_LABEL[row.status] || '').toUpperCase(), x + 8, y + 64);
+    });
+    y += 74;
+
+    // Body weight
+    const bs = bodySummary(r.bodyStats), b = r.bodyStats;
+    if (bs) {
+      heading('Body weight');
+      const bw = (CW - 3 * 8) / 4;
+      bs.rows.forEach((x, i) => {
+        doc.setFillColor(i === 3 ? PC.accentSoft : PC.tile); doc.roundedRect(M + i * (bw + 8), y, bw, 46, 7, 7, 'F');
+        font(7.5, 'bold', PC.muted); doc.text(x[0].toUpperCase(), M + i * (bw + 8) + 10, y + 16);
+        font(14, 'bold', PC.ink); doc.text(x[1], M + i * (bw + 8) + 10, y + 36);
+      });
+      y += 56;
+      if (bs.pct != null) {
+        doc.setFillColor(PC.line); doc.roundedRect(M, y, CW, 7, 3.5, 3.5, 'F');
+        doc.setFillColor(PC.accent); doc.roundedRect(M, y, Math.max(7, CW * bs.pct / 100), 7, 3.5, 3.5, 'F');
+        y += 18;
+      }
+      font(9.5, 'normal', PC.muted); doc.text(doc.splitTextToSize((bs.pct != null ? bs.pct + '% of the way. ' : '') + bs.line, CW), M, y + 4); y += 14;
+      // trend chart
+      const pts = b.entries.slice(-16);
+      if (pts.length >= 2) {
+        need(120); y += 6;
+        const ch = 96, vals = pts.map((p) => p.kg).concat(b.target != null ? [b.target] : []);
+        const lo = Math.min.apply(null, vals) - 1, hi = Math.max.apply(null, vals) + 1;
+        const X = (i) => M + 34 + i * (CW - 44) / (pts.length - 1), Y = (v) => y + 6 + (hi - v) / (hi - lo) * (ch - 20);
+        doc.setFillColor('#fbfbfd'); doc.roundedRect(M, y, CW, ch, 8, 8, 'F');
+        font(7.5, 'normal', PC.muted); doc.text(k1(hi - 1), M + 6, Y(hi - 1) + 3); doc.text(k1(lo + 1), M + 6, Y(lo + 1) + 3);
+        if (b.target != null) {
+          doc.setDrawColor(PC.gold); doc.setLineDashPattern([3, 3], 0); doc.setLineWidth(1);
+          doc.line(M + 34, Y(b.target), W - M - 10, Y(b.target)); doc.setLineDashPattern([], 0);
+          font(7.5, 'bold', PC.gold); doc.text('target ' + k1(b.target), W - M - 10, Y(b.target) - 4, { align: 'right' });
+        }
+        doc.setDrawColor(PC.accent); doc.setLineWidth(2);
+        for (let i = 1; i < pts.length; i++) doc.line(X(i - 1), Y(pts[i - 1].kg), X(i), Y(pts[i].kg));
+        pts.forEach((p, i) => { doc.setFillColor(i === pts.length - 1 ? PC.accent : '#ffffff'); doc.setDrawColor(PC.accent); doc.setLineWidth(1.2); doc.circle(X(i), Y(p.kg), i === pts.length - 1 ? 3.5 : 2.5, 'FD'); });
+        font(7.5, 'normal', PC.muted); doc.text(fmt(pts[0].k), M + 34, y + ch - 5); doc.text(fmt(pts[pts.length - 1].k), W - M - 10, y + ch - 5, { align: 'right' });
+        y += ch;
+      }
     }
-    function heading(t) { y += 14; need(40); text(t, 13, 'bold'); y += 4; }
-    function table(cols, rows) {
-      let rh = 20;
-      function line() { doc.setDrawColor(LINE); doc.line(M, y, W - M, y); }
-      function rowOut(vals, bold, color) {
-        need(rh); let x = M;
-        doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(bold ? 9 : 10); doc.setTextColor(color || INK);
-        vals.forEach(function (v, i) {
-          let c = cols[i], s = doc.splitTextToSize(String(v), c.w - 8)[0] || '';
-          if (c.right) doc.text(s, x + c.w - 4, y + 14, { align: 'right' }); else doc.text(s, x + 4, y + 14);
+
+    // Lifting weights table
+    heading('Lifting weights');
+    if (r.weights.length) {
+      const cols = [{ l: 'Exercise', w: CW - 240 }, { l: 'This week', w: 80, r: 1 }, { l: 'Last week', w: 80, r: 1 }, { l: 'Change', w: 80, r: 1 }];
+      const row = (vals, opts) => {
+        need(22); let x = M;
+        if (opts.fill) { doc.setFillColor(opts.fill); doc.rect(M, y, CW, 22, 'F'); }
+        vals.forEach((v, i) => {
+          const c = cols[i];
+          font(opts.head ? 7.5 : 9.5, opts.head || i === 1 ? 'bold' : 'normal', opts.head ? PC.muted : (i === 3 ? opts.chColor : PC.ink));
+          const s = doc.splitTextToSize(String(v), c.w - 12)[0] || '';
+          if (c.r) doc.text(s, x + c.w - 8, y + 15, { align: 'right' }); else doc.text(s, x + 8, y + 15);
           x += c.w;
         });
-        y += rh; line();
-      }
-      rowOut(cols.map(function (c) { return c.label; }), true, MUTED);
-      rows.forEach(function (r2) { rowOut(r2); });
-      y += 6;
-    }
-    text('Gym report', 22, 'bold');
-    text(fmt(r.ws) + ' to ' + fmt(r.we) + ' ' + fromKey(r.ws).getFullYear(), 11, 'normal', MUTED);
-    y += 10;
-    doc.setFillColor('#f6f8fc');
-    let vLines = doc.splitTextToSize(r.verdict, CW - 20);
-    doc.roundedRect(M, y, CW, vLines.length * 15 + 16, 6, 6, 'F');
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(INK);
-    vLines.forEach(function (l, i) { doc.text(l, M + 10, y + 20 + i * 15); });
-    y += vLines.length * 15 + 16;
+        y += 22;
+      };
+      row(cols.map((c) => c.l.toUpperCase()), { head: true, fill: PC.tile });
+      r.weights.forEach((w, i) => row([w.name, w.now + ' kg', w.last != null ? w.last + ' kg' : '-', weightChange(w)],
+        { fill: i % 2 ? '#fafafc' : null, chColor: w.last == null ? PC.muted : w.now > w.last ? PC.up : w.now < w.last ? PC.down : PC.muted }));
+    } else { font(9.5, 'normal', PC.muted); doc.text('No weights logged this week.', M, y + 4); y += 12; }
 
-    heading('Summary');
-    table([{ label: 'Measure', w: 170 }, { label: 'Value', w: CW - 170 }], summaryRows(r));
-
-    heading('Day by day');
-    table([{ label: 'Day', w: 100 }, { label: 'Focus', w: 150 }, { label: 'Items', w: 60, right: true }, { label: 'Steps', w: 80, right: true }, { label: 'Status', w: CW - 390 }],
-      r.rows.map(function (row) { return [DAY_SHORT[dow(row.k)] + ' ' + fmt(row.k), row.p.focus, row.st.done + '/' + row.st.total, row.st.steps ? num(row.st.steps) : '-', STATUS_LABEL[row.status]]; }));
-
+    // Missed
     heading('Missed');
-    if (r.missed.length) r.missed.forEach(function (m) { text(DAY_NAMES[dow(m.k)] + ': ' + m.items.join(', '), 10); y += 3; });
-    else text('Nothing missed.', 10, 'normal', MUTED);
+    if (r.missed.length) {
+      r.missed.forEach((m) => {
+        const lines = doc.splitTextToSize(m.items.join(', '), CW - 58);
+        need(lines.length * 13 + 8);
+        doc.setFillColor(PC.missed); doc.roundedRect(M, y - 1, 44, 16, 4, 4, 'F');
+        font(8, 'bold', PC.down); doc.text(DAY_SHORT[dow(m.k)].toUpperCase(), M + 22, y + 10, { align: 'center' });
+        font(9.5, 'normal', PC.ink); lines.forEach((l, i) => doc.text(l, M + 54, y + 10 + i * 13));
+        y += lines.length * 13 + 8;
+      });
+    } else { font(9.5, 'normal', PC.muted); doc.text('Nothing missed. Clean week.', M, y + 4); y += 12; }
 
-    heading('Weights');
-    if (r.weights.length) table([{ label: 'Exercise', w: CW - 240 }, { label: 'This week', w: 80, right: true }, { label: 'Last week', w: 80, right: true }, { label: 'Change', w: 80, right: true }],
-      r.weights.map(function (w) { return [w.name, w.now + ' kg', w.last != null ? w.last + ' kg' : '-', weightChange(w)]; }));
-    else text('No weights logged.', 10, 'normal', MUTED);
+    // Notes
+    const notes = notesOf(r);
+    if (notes.length) {
+      heading('Notes');
+      notes.forEach((k) => {
+        const lines = doc.splitTextToSize(DAY_SHORT[dow(k)] + ' ' + fmt(k) + ':  ' + dayRead(k).note, CW - 24);
+        need(lines.length * 13 + 14);
+        doc.setFillColor(PC.tile); doc.rect(M, y, CW, lines.length * 13 + 10, 'F');
+        doc.setFillColor(PC.accent); doc.rect(M, y, 3, lines.length * 13 + 10, 'F');
+        font(9.5, 'normal', PC.ink); lines.forEach((l, i) => doc.text(l, M + 12, y + 15 + i * 13));
+        y += lines.length * 13 + 16;
+      });
+    }
 
-    heading('Body weight');
-    text(bodyLine(r), 10);
-
-    let notes = weekDays(r.ws).filter(function (k) { return (dayRead(k).note || '').trim(); });
-    if (notes.length) { heading('Notes'); notes.forEach(function (k) { text(DAY_SHORT[dow(k)] + ': ' + dayRead(k).note, 10); y += 3; }); }
-
+    // Footer on every page
+    const pages = doc.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i); font(8, 'normal', PC.muted);
+      doc.text('Gym log  |  ' + fmt(r.ws) + ' to ' + fmt(r.we), M, H - 22);
+      doc.text('Page ' + i + ' of ' + pages, W - M, H - 22, { align: 'right' });
+    }
     doc.save('gym-report-' + r.ws + '.pdf');
     toast('PDF downloaded.');
   }).catch(function () { toast('Could not load the PDF maker. Check internet, or use Word.'); });
 }
-

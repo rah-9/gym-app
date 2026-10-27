@@ -131,15 +131,52 @@ export function weightHint(k, e) {
   };
 }
 
-// The note you wrote the last time you did this same workout, as a reminder.
-export function lastNoteFor(k) {
+// Notes come back once, on the day you chose: the next time this workout comes round (default),
+// tomorrow, or never. noteFor: 'next' | 'tomorrow' | 'off'.
+export function nextSameWorkout(k) {
   const key = workoutKeyFor(k);
-  for (let i = 1; i <= 70; i++) {
-    const kk = addDays(k, -i), d = S.days[kk];
-    if (d && (d.note || '').trim() && workoutKeyFor(kk) === key) return { k: kk, note: d.note.trim() };
-  }
+  for (let i = 1; i <= 21; i++) { const kk = addDays(k, i); if (workoutKeyFor(kk) === key) return kk; }
   return null;
 }
+export function noteTarget(k) {
+  const d = S.days[k];
+  if (!d || !(d.note || '').trim()) return null;
+  const mode = d.noteFor || 'next';
+  if (mode === 'off') return null;
+  return mode === 'tomorrow' ? addDays(k, 1) : nextSameWorkout(k);
+}
+export function notesForDay(k) {
+  const out = [];
+  for (let i = 1; i <= 21; i++) {
+    const kk = addDays(k, -i);
+    if (noteTarget(kk) === k) out.push({ k: kk, note: S.days[kk].note.trim() });
+  }
+  return out;
+}
+export const lastNoteFor = (k) => notesForDay(k)[0] || null;
+
+/* ---------- body weight ---------- */
+// Start = your set start weight or first weigh-in. Rate = kg per week over about the last 4 weeks.
+export function bodyStats(upTo) {
+  const end = upTo || todayKey();
+  const entries = Object.keys(S.body).filter((k) => k <= end && S.body[k] > 0).sort().map((k) => ({ k, kg: +S.body[k] }));
+  const target = parseFloat(S.settings.targetKg) || null;
+  if (!entries.length) return { entries, target, current: null };
+  const first = entries[0], last = entries[entries.length - 1];
+  const start = parseFloat(S.settings.startKg) || first.kg;
+  const current = last.kg;
+  const lost = Math.round((start - current) * 10) / 10;
+  const toGo = target != null ? Math.round((current - target) * 10) / 10 : null;
+  const pct = target != null && start > target ? Math.max(0, Math.min(100, Math.round((start - current) / (start - target) * 100))) : null;
+  const from = entries.filter((e) => e.k <= addDays(last.k, -21)).pop() || first;
+  const days = Math.round((fromKey(last.k) - fromKey(from.k)) / 864e5);
+  const rate = days >= 6 ? Math.round((from.kg - current) / days * 7 * 10) / 10 : null; // kg lost per week
+  let eta = null;
+  if (toGo != null && toGo > 0 && rate && rate > 0) eta = addDays(last.k, Math.round(toGo / rate * 7));
+  return { entries, target, start, current, last: last.k, lost, toGo, pct, rate, eta };
+}
+
+export const WATER_GOAL = 12; // glasses of 250 ml = 3 litres
 
 // Session length in minutes from the first tick to the finish (or now if still going).
 export function sessionMinutes(k) {

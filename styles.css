@@ -790,3 +790,56 @@ button.cal-cell:active { transform: scale(0.94); }
 .sheet-note { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); white-space: pre-wrap; }
 .sheet-actions { display: flex; gap: 8px; margin-top: 18px; }
 .sheet-actions button { flex: 1; }
+
+/* ---------- Notes: remind me on ---------- */
+.note-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-top: 8px; }
+.note-row .note-status { margin-top: 0; flex: 1 1 200px; }
+.segs { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
+.segs-l { font-size: 11.5px; color: var(--muted); padding: 0 6px 0 8px; }
+.seg { border: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 500; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
+.seg.on { background: var(--surface-3); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(185, 168, 255, 0.35); }
+
+/* ---------- Water counter ---------- */
+.watercard, .bodycard { margin-top: 10px; gap: 10px; }
+.water-ctl { display: inline-flex; align-items: center; gap: 10px; }
+.water-ctl b { font-size: 18px; font-variant-numeric: tabular-nums; min-width: 52px; text-align: center; }
+.wbtn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font-size: 20px; line-height: 1; padding: 0; }
+.wbtn.plus { background: #f5f5f7; color: #0a0a0c; border-color: #f5f5f7; }
+.glasses { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; }
+.glasses i { height: 18px; border-radius: 3px 3px 6px 6px; background: var(--surface-3); }
+.glasses i.on { background: linear-gradient(180deg, #d9d0ff, #9fb4ff); box-shadow: 0 0 8px rgba(159, 180, 255, 0.35); }
+
+/* ---------- Body weight ---------- */
+.body-in { display: inline-flex; align-items: center; gap: 8px; }
+.body-in .kg input { width: 58px; }
+.bwcard { gap: 12px; }
+.bw-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.bw-tiles div { display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; border-radius: 12px; background: var(--surface-2); text-align: center; }
+.bw-tiles span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.bw-tiles b { font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.bw-tiles .hl { background: rgba(185, 168, 255, 0.12); box-shadow: inset 0 0 0 1px rgba(185, 168, 255, 0.3); }
+.bw-tiles .hl b { color: #d9d0ff; }
+.bw-prog { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.wchart { width: 100%; height: auto; display: block; }
+.wc-line { fill: none; stroke: #b9a8ff; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.wc-dot { fill: var(--surface); stroke: #b9a8ff; stroke-width: 1.5; }
+.wc-dot.last { fill: #ffffff; stroke: #ffffff; }
+.wc-target { stroke: var(--gold); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.wc-tl { fill: var(--gold); font-size: 10px; font-family: var(--font); }
+.wc-ax { fill: var(--muted); font-size: 10px; font-family: var(--font); }
+.bw-pace { margin: 0; font-size: 14px; color: var(--ink-2); }
+.bw-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.bw-form .kg.big input { width: 70px; }
+.small { font-size: 12.5px; }
+
+/* ---------- Reminders ---------- */
+.rem-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 4px 0 12px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+.rem-row .muted.small { margin-top: 2px; }
+.switch { flex: none; width: 50px; height: 30px; border-radius: 999px; border: 0; background: var(--surface-3); position: relative; padding: 0; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--muted); transition: transform 0.15s; }
+.switch.on { background: #f5f5f7; }
+.switch.on::after { transform: translateX(20px); background: #0a0a0c; }
+
+.body-in .kg { padding: 0 10px; }
+.body-in .kg input { width: 66px; }
+.note-row .note-status { flex: 0 1 auto; }
