@@ -81,7 +81,7 @@ function confetti(canvas) {
   if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return () => {};
   const ctx = canvas.getContext('2d'), dpr = window.devicePixelRatio || 1;
   const W = canvas.width = innerWidth * dpr, H = canvas.height = innerHeight * dpr;
-  const colors = ['#3DDC97', '#7CF0C0', '#2BB8D9', '#E9C46A', '#F4F7F6'];
+  const colors = ['#a78bfa', '#8b5cf6', '#22d3ee', '#f5c451', '#f472b6', '#f5f6ff'];
   const parts = Array.from({ length: 130 }, () => ({
     x: W / 2 + (Math.random() - 0.5) * W * 0.3, y: H * 0.42,
     vx: (Math.random() - 0.5) * 16 * dpr, vy: (-Math.random() * 15 - 6) * dpr,

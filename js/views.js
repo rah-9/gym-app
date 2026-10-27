@@ -12,7 +12,41 @@ import { $, esc, fmt, keyOf, fromKey, addDays, todayKey, weekStartOf, weekDays, 
 
 export const ui = { view: 'today', selDate: todayKey(), reportWs: weekStartOf(todayKey()), open: {} };
 
+// Each workout has its own colour so every day of the week feels different.
+export const DAY_COLORS = {
+  chest: '#f472b6', push: '#f472b6', arms: '#22d3ee', back: '#818cf8', shoulders: '#fbbf24',
+  armsplus: '#a78bfa', legday: '#60a5fa', legs: '#60a5fa', rest: '#94a3b8'
+};
+const dayColor = (k) => DAY_COLORS[workoutKeyFor(k)] || '#8b5cf6';
+
+// A different line every day of the year.
+const LINES = [
+  'Discipline is choosing what you want most over what you want now.',
+  'You do not have to be extreme, just consistent.',
+  'The body you want is built on days you did not feel like it.',
+  'Small steps every day add up to big results.',
+  'Show up. The rest follows.',
+  'Strength is earned one rep at a time.',
+  'Progress, not perfection.',
+  'Your only competition is who you were yesterday.',
+  'Sweat now, shine later.',
+  'Motivation gets you started. Habit keeps you going.',
+  'Every workout is a deposit in your future self.',
+  'Hard days build strong people.',
+  'One more set than yesterday is how you win.',
+  'Make today count. Tomorrow will thank you.'
+];
+function dailyLine(k) {
+  const d = fromKey(k), start = new Date(d.getFullYear(), 0, 0);
+  return LINES[Math.floor((d - start) / 864e5) % LINES.length];
+}
+function greeting() {
+  const h = new Date().getHours();
+  return (h < 5 ? 'Late night' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening') + ', Rahul';
+}
+
 export function render() {
+  document.documentElement.style.setProperty('--day', dayColor(ui.selDate));
   const v = $('#view');
   v.innerHTML = ui.view === 'report' ? renderReport() : ui.view === 'plan' ? renderPlan() : renderToday();
   document.querySelectorAll('.tabs button').forEach((b) => {
@@ -97,7 +131,7 @@ function weekStrip(k) {
   const html = weekDays(weekStartOf(k)).map((dk) => {
     const st = dayStatus(dk), p = planFor(dk);
     return '<button type="button" class="day ' + st + (dk === k ? ' sel' : '') + (dk === today ? ' is-today' : '') + '" data-action="pick" data-k="' + dk + '">' +
-      '<span class="dn">' + DAY_SHORT[dow(dk)] + '</span><span class="dd">' + fromKey(dk).getDate() + '</span><span class="df">' + p.short + '</span></button>';
+      '<span class="dn">' + DAY_SHORT[dow(dk)] + '</span><span class="dd">' + fromKey(dk).getDate() + '</span><span class="df" style="--dc:' + dayColor(dk) + '">' + p.short + '</span></button>';
   }).join('');
   return '<div class="weeknav"><button type="button" class="arrow" data-action="shift" data-n="-7" aria-label="Previous week">&#8249;</button>' +
     '<div class="strip">' + html + '</div>' +
@@ -107,7 +141,7 @@ function weekStrip(k) {
 function ring(pct) {
   const r = 26, c = 2 * Math.PI * r, off = c * (1 - pct / 100);
   return '<svg class="ring' + (pct === 100 ? ' full' : '') + '" viewBox="0 0 64 64" aria-hidden="true">' +
-    '<defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7CF0C0"/><stop offset="1" stop-color="#2BB8D9"/></linearGradient></defs>' +
+    '<defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c4b5fd"/><stop offset="0.5" stop-color="#8b5cf6"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>' +
     '<circle cx="32" cy="32" r="' + r + '" class="ring-bg"/>' +
     '<circle cx="32" cy="32" r="' + r + '" class="ring-fg" stroke="url(#ringGrad)" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '"/>' +
     '<text x="32" y="37" text-anchor="middle">' + pct + '%</text></svg>';
@@ -131,6 +165,7 @@ function hero(k) {
   const complete = !p.rest && st.pct === 100;
   return '<section class="hero' + (complete ? ' complete' : '') + '">' +
     (complete ? '<div class="hero-badge">Workout complete</div>' : '') +
+    (k === today && !complete ? '<div class="greet">' + greeting() + '</div>' : '') +
     '<div class="hero-top"><div class="hero-text">' +
     '<div class="eyebrow">' + DAY_NAMES[dow(k)] + ', ' + fmt(k) + (k === today ? ' &middot; today' : '') + (wk ? ' &middot; week ' + wk : '') + '</div>' +
     '<h1>' + esc(p.focus) + '</h1>' +
@@ -139,6 +174,7 @@ function hero(k) {
     '</div>' + ring(st.pct) + '</div>' +
     (k === today ? heroStats() : '') +
     (sub ? '<div class="hero-next">' + esc(sub) + '</div>' : '') + swap +
+    (k === today ? '<div class="hero-quote">' + esc(dailyLine(k)) + '</div>' : '') +
     '</section>';
 }
 
