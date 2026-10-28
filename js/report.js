@@ -1,6 +1,6 @@
 /* Weekly report: numbers, plain text, Word (.doc) and PDF downloads. */
 import { S } from './store.js';
-import { planFor, dayRead, dayStats, dayStatus, counts, streak, bestStreak, monthStats, totalWorkoutDays, workedOut, EX_NAMES, STATUS_LABEL, STEP_GOAL, bodyStats, deadlineText, sessionMinutes, penaltyWeek } from './plan.js';
+import { planFor, dayRead, dayStats, dayStatus, counts, streak, bestStreak, monthStats, totalWorkoutDays, workedOut, EX_NAMES, STATUS_LABEL, STEP_GOAL, bodyStats, deadlineText, sessionMinutes, penaltyWeek, missedWeek } from './plan.js';
 import { esc, fmt, fromKey, addDays, todayKey, weekDays, dow, num, download, toast, DAY_NAMES, DAY_SHORT } from './util.js';
 
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
@@ -60,7 +60,7 @@ export function reportData(ws) {
   return {
     ws: ws, we: addDays(ws, 6), rows: rows, missed: missed, todo: todo, score: score,
     total: total, done: done, trained: trained, fullDays: fullDays, trainDays: trainDays, sets: sets, bonus: bonus,
-    asOf: asOf, month: monthStats(asOf), best: bestStreak(asOf), totalDays: totalWorkoutDays(), bodyStats: bodyStats(asOf), penalty: penaltyWeek(ws),
+    asOf: asOf, month: monthStats(asOf), best: bestStreak(asOf), totalDays: totalWorkoutDays(), bodyStats: bodyStats(asOf), penalty: penaltyWeek(ws), missedW: missedWeek(ws),
     habitsPct: habitsTotal ? Math.round(habitsDone / habitsTotal * 100) : 0,
     mealsPct: mealsTotal ? Math.round(mealsDone / mealsTotal * 100) : 0,
     stepsTotal: stepsTotal, stepsDays: stepsDays, stepsGoal: stepsGoal,
@@ -235,6 +235,10 @@ export function docReport(r) {
     const ch = weightChange(w), col = w.last == null ? PC.muted : w.now > w.last ? PC.up : w.now < w.last ? PC.down : PC.muted;
     return '<tr' + (i % 2 ? ' style="background:#fafafc"' : '') + '><td>' + esc(w.name) + '</td><td><b>' + w.now + ' kg</b></td><td>' + (w.last != null ? w.last + ' kg' : '-') + '</td><td style="color:' + col + ';font-weight:bold">' + ch + '</td></tr>';
   }).join('') + '</table>' : '<p style="color:' + PC.muted + '">No weights logged this week.</p>');
+  // missed workouts
+  h += h2('Missed workouts') + (r.missedW.items.length
+    ? '<table class="t"><tr><th>Day</th><th>Workout</th><th>Make-up done</th><th>Points back</th><th>Status</th></tr>' + r.missedW.items.map((t) => '<tr><td>' + DAY_SHORT[dow(t.k)] + ' ' + fmt(t.k) + '</td><td>' + esc(t.name) + '</td><td>' + t.done + ' of ' + t.total + '</td><td>' + t.earned + ' of 5</td><td style="font-weight:bold;color:' + (t.status === 'done' ? PC.up : t.status === 'owed' ? PC.down : PC.muted) + '">' + (t.status === 'done' ? 'Made up' : t.status === 'owed' ? 'Not made up' : 'Make-up pending') + '</td></tr>').join('') + '</table>'
+    : '<p style="color:' + PC.muted + '">No fully missed workout days.</p>');
   // junk food
   h += h2('Junk food') + (r.penalty.items.length
     ? '<table><tr>' + [['Penalty', r.penalty.points + ' pts'], ['Earned back', r.penalty.back + ' pts'], ['Still owed', r.penalty.net + ' pts'], ['Extra kcal', num(r.penalty.kcal)]].map((x, i) =>
@@ -309,7 +313,7 @@ export function pdfReport(r) {
       font(7.5, 'bold', PC.muted); doc.text(DAY_SHORT[dow(row.k)].toUpperCase() + ' ' + fromKey(row.k).getDate(), x + 8, y + 18);
       font(10.5, 'bold', PC.ink); doc.text(row.p.short, x + 8, y + 34);
       font(9, 'normal', PC.ink); doc.text(row.p.rest ? 'Rest' : row.st.done + ' / ' + row.st.total, x + 8, y + 49);
-      font(7.5, 'bold', f[1]); doc.text((STATUS_LABEL[row.status] || '').toUpperCase(), x + 8, y + 64);
+      font(7.5, 'bold', f[1]); doc.text((row.status === 'missed' ? 'X  ' : '') + (STATUS_LABEL[row.status] || '').toUpperCase(), x + 8, y + 64);
     });
     y += 74;
 
@@ -382,6 +386,20 @@ export function pdfReport(r) {
       r.weights.forEach((w, i) => row([w.name, w.now + ' kg', w.last != null ? w.last + ' kg' : '-', weightChange(w)],
         { fill: i % 2 ? '#fafafc' : null, chColor: w.last == null ? PC.muted : w.now > w.last ? PC.up : w.now < w.last ? PC.down : PC.muted }));
     } else { font(9.5, 'normal', PC.muted); doc.text('No weights logged this week.', M, y + 4); y += 12; }
+
+    // Missed workouts
+    heading('Missed workouts');
+    if (r.missedW.items.length) {
+      r.missedW.items.forEach((t) => {
+        need(20);
+        doc.setFillColor(PC.missed); doc.roundedRect(M, y - 1, 44, 16, 4, 4, 'F');
+        font(8, 'bold', PC.down); doc.text(DAY_SHORT[dow(t.k)].toUpperCase(), M + 22, y + 10, { align: 'center' });
+        font(9.5, 'normal', PC.ink); doc.text(t.name + ', make-up ' + t.done + ' of ' + t.total + ' done', M + 54, y + 10);
+        font(8.5, 'bold', t.status === 'done' ? PC.up : t.status === 'owed' ? PC.down : PC.muted);
+        doc.text(t.status === 'done' ? 'Made up' : t.status === 'owed' ? 'Not made up' : 'Pending', W - M, y + 10, { align: 'right' });
+        y += 20;
+      });
+    } else { font(9.5, 'normal', PC.muted); doc.text('No fully missed workout days.', M, y + 4); y += 12; }
 
     // Junk food
     heading('Junk food');

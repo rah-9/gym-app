@@ -211,6 +211,12 @@ const ACTIONS = {
     const d = dayWrite(ui.selDate);
     (d.treats || []).splice(+el.dataset.i, 1); save(); render(); toast('Removed.');
   },
+  'makeup-tick': (el) => {
+    const d = dayWrite(ui.selDate);
+    d.makeupDone = Object.assign({}, d.makeupDone);
+    d.makeupDone[el.dataset.id] = !d.makeupDone[el.dataset.id];
+    save(); render(); if (d.makeupDone[el.dataset.id]) toast('Make-up done. Points coming back.');
+  },
   'balance-tick': (el) => {
     const d = dayWrite(ui.selDate);
     d.balanceDone = Object.assign({}, d.balanceDone);

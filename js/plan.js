@@ -441,7 +441,8 @@ export function balanceDone(k) {
   const b = balanceFor(k);
   if (!b) return null;
   const d = S.days[k] || {}, ticks = d.balanceDone || {};
-  const tasks = b.tasks.map((t) => ({ id: t.id, done: t.kind === 'steps' ? (parseInt(d.steps, 10) || 0) >= stepGoalFor(k) : !!ticks[t.id] }));
+  // Every task can be ticked by hand; the steps task also ticks itself once the raised step goal is reached.
+  const tasks = b.tasks.map((t) => ({ id: t.id, done: !!ticks[t.id] || (t.kind === 'steps' && (parseInt(d.steps, 10) || 0) >= stepGoalFor(k)) }));
   if (b.noJunk) tasks.push({ id: 'nojunk', done: !!(d.habits || {}).nojunk && !treatsOn(k).length });
   const done = tasks.filter((t) => t.done).length;
   return { tasks, done, total: tasks.length, complete: done === tasks.length };
@@ -524,4 +525,63 @@ export function badges() {
 export function kgHistory(id, upTo, n) {
   return Object.keys(S.days).filter((k) => k <= upTo && parseFloat(((S.days[k] || {}).kg || {})[id]) > 0).sort()
     .slice(-(n || 6)).map((k) => ({ k, kg: parseFloat(S.days[k].kg[id]) }));
+}
+
+
+/* ---------- missed workout make-ups ----------
+   Only a fully missed training day counts: not a single real exercise ticked (warm up or cardio
+   alone does not save it). Partly done days never trigger this.
+   A missed day costs 5 penalty points and adds 3 make-up items, one on each of the next 3
+   training days (rest days skipped): the 2 main lifts of the missed workout, then 15 min cardio.
+   At most 2 make-up items land on one day so it stays doable. Finishing them earns the points back. */
+export const MISSED_POINTS = 5;
+
+function nextTrainingDays(k, n) {
+  const out = [];
+  for (let i = 1; i <= 14 && out.length < n; i++) { const kk = addDays(k, i); if (!planFor(kk).rest) out.push(kk); }
+  return out;
+}
+
+export function isMissedWorkout(k) {
+  const first = firstWorkoutDay();
+  return !!first && k > first && k < todayKey() && k >= PROGRAM_START && !planFor(k).rest && !workedOut(k);
+}
+
+function makeupItems(m) {
+  const p = planFor(m);
+  const lifts = mainExercises(p).filter((e) => e.id !== 'warmup' && !/plank/.test(e.id)).slice(0, 2);
+  const items = lifts.map((e) => ({ kind: 'ex', exId: e.id, name: e.name, detail: e.sets + ' x ' + e.reps + ', ' + e.machine }));
+  items.push({ kind: 'cardio', name: 'Extra cardio, 15 min', detail: (p.cardio ? p.cardio.name : 'Incline walk or spin bike') + ', easy to moderate pace' });
+  const days = nextTrainingDays(m, items.length);
+  return items.map((it, i) => Object.assign(it, { id: 'mk-' + m + '-' + i, from: m, day: days[i] }));
+}
+
+// Make-up items due on day k.
+export function makeupFor(k) {
+  const out = [];
+  for (let i = 1; i <= 12; i++) {
+    const m = addDays(k, -i);
+    if (!isMissedWorkout(m)) continue;
+    makeupItems(m).forEach((it) => { if (it.day === k) out.push(it); });
+  }
+  return out.slice(0, 2);
+}
+export const makeupTicked = (k, id) => !!(((S.days[k] || {}).makeupDone || {})[id]);
+
+// Missed workout days in a week with their make-up progress.
+export function missedWeek(ws) {
+  const today = todayKey();
+  const items = [];
+  let points = 0, back = 0;
+  for (let i = 0; i < 7; i++) {
+    const m = addDays(ws, i);
+    if (!isMissedWorkout(m)) continue;
+    const mk = makeupItems(m);
+    const done = mk.filter((it) => makeupTicked(it.day, it.id)).length;
+    const pending = mk.some((it) => it.day >= today && !makeupTicked(it.day, it.id));
+    const earned = Math.round(MISSED_POINTS * done / mk.length);
+    points += MISSED_POINTS; back += earned;
+    items.push({ k: m, name: planFor(m).focus, done, total: mk.length, earned, status: done === mk.length ? 'done' : pending ? 'pending' : 'owed', days: mk.map((it) => it.day) });
+  }
+  return { items, points, back, net: points - back };
 }

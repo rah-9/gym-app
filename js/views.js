@@ -4,7 +4,7 @@ import { S } from './store.js';
 import {
   planFor, workoutKeyFor, schedule, dayRead, dayStats, dayStatus, hasProgress, mainExercises, bonusExercises,
   weightHint, musclesFor, nextUp, programWeek, counts, stepsPct, STEP_GOAL, STATUS_LABEL, WEEK_ORDER,
-  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, deadlineText, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek, stepGoalFor, treatDays, badges, kgHistory
+  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, deadlineText, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek, stepGoalFor, treatDays, badges, kgHistory, makeupFor, makeupTicked, isMissedWorkout, missedWeek, MISSED_POINTS
 } from './plan.js';
 import { reportData, bestLabel } from './report.js';
 import * as notify from './notify.js';
@@ -136,9 +136,9 @@ function simpleCard(action, id, on, name, detail, info) {
 function weekStrip(k) {
   const today = todayKey();
   const html = weekDays(weekStartOf(k)).map((dk) => {
-    const st = dayStatus(dk), p = planFor(dk);
+    const st = isMissedWorkout(dk) ? 'missed' : dayStatus(dk), p = planFor(dk);
     return '<button type="button" class="day ' + st + (dk === k ? ' sel' : '') + (dk === today ? ' is-today' : '') + '" data-action="pick" data-k="' + dk + '">' +
-      '<span class="dn">' + DAY_SHORT[dow(dk)] + '</span><span class="dd">' + fromKey(dk).getDate() + '</span><span class="df" style="--dc:' + dayColor(dk) + '">' + p.short + '</span></button>';
+      '<span class="dn">' + DAY_SHORT[dow(dk)] + '</span><span class="dd">' + fromKey(dk).getDate() + (isMissedWorkout(dk) ? '<i class="xmark" aria-label="missed">&#10005;</i>' : '') + '</span><span class="df" style="--dc:' + dayColor(dk) + '">' + p.short + '</span></button>';
   }).join('');
   return '<div class="weeknav"><button type="button" class="arrow" data-action="shift" data-n="-7" aria-label="Previous week">&#8249;</button>' +
     '<div class="strip">' + html + '</div>' +
@@ -159,7 +159,7 @@ function weekBar(k) {
   const ws = weekStartOf(k), days = weekDays(ws).filter((dk) => !planFor(dk).rest);
   const done = days.filter((dk) => dayStatus(dk) === 'done').length;
   return '<div class="weekbar"><div class="wb-segs">' + days.map((dk) =>
-    '<i class="' + dayStatus(dk) + (dk === todayKey() ? ' now' : '') + '" title="' + DAY_SHORT[dow(dk)] + '"></i>').join('') +
+    '<i class="' + (isMissedWorkout(dk) ? 'missed' : dayStatus(dk)) + (dk === todayKey() ? ' now' : '') + '" title="' + DAY_SHORT[dow(dk)] + '"></i>').join('') +
     '</div><span>' + done + ' of ' + days.length + ' this week</span></div>';
 }
 
@@ -225,7 +225,8 @@ function reminderHtml() {
   const y = addDays(today, -1), py = planFor(y);
   if (!py.rest && counts(y)) {
     const sy = dayStats(y);
-    if (sy.done === 0) msgs.push('Yesterday (' + DAY_NAMES[dow(y)] + ', ' + py.focus + ') was missed. No stress, today counts.');
+    if (isMissedWorkout(y)) msgs.push('Yesterday (' + DAY_NAMES[dow(y)] + ', ' + py.focus + ') was fully missed. Make-up items were added to your next 3 training days.');
+    else if (sy.done === 0) msgs.push('Yesterday (' + DAY_NAMES[dow(y)] + ', ' + py.focus + ') was missed. No stress, today counts.');
     else if (sy.pct < 100) msgs.push('Yesterday was ' + sy.pct + '% done. ' + (sy.total - sy.done) + ' items were left.');
   }
   const p = planFor(today), st = dayStats(today);
@@ -260,7 +261,7 @@ function renderToday() {
     notesForDay(k).forEach((ln) => {
       body += '<div class="memo"><span class="memo-h">Note from ' + DAY_SHORT[dow(ln.k)] + ' ' + fmt(ln.k) + ' (' + esc(planFor(ln.k).short) + ')</span><p>' + esc(ln.note) + '</p></div>';
     });
-    body += balanceCard(k);
+    body += makeupCard(k) + balanceCard(k);
     body += '<h2>Workout <span class="h-note">top to bottom, tap a name for tips</span></h2><ul class="list">' +
       mainExercises(p).map((e) => exerciseCard(e, d, false, e.id === nextId)).join('') + '</ul>';
     body += '<h2>Bonus <span class="h-note">if your body allows today</span></h2>' +
@@ -357,7 +358,7 @@ function renderReport() {
     '<h2>Day by day</h2><div class="tablewrap"><table class="days"><thead><tr><th>Day</th><th>Workout</th><th class="num">Done</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<h2>Missed</h2>' + missed + todo +
     '<h2>Weights</h2>' + weights +
-    bodySection() + junkSection(r.penalty) + badgeSection() +
+    bodySection() + missedSection(r.missedW) + junkSection(r.penalty) + badgeSection() +
     '<h2>Save this report</h2><div class="saverow">' +
     '<button type="button" class="primary" data-action="pdf-report">PDF</button>' +
     '<button type="button" class="ghost" data-action="doc-report">Word</button>' +
@@ -373,8 +374,8 @@ function monthCalendar(k) {
   for (let i = 0; i < lead; i++) cells += '<span class="cal-cell empty"></span>';
   for (let i = 0; i < days; i++) {
     const dk = addDays(first, i), st = dayStatus(dk), p = planFor(dk);
-    const cls = p.rest && st !== 'done' ? 'rest' : st === 'today' && hasProgress(dk) ? 'partial' : st;
-    cells += '<button type="button" class="cal-cell ' + cls + (dk === today ? ' is-today' : '') + '" data-action="cal-day" data-k="' + dk + '" aria-label="' + esc(fmt(dk) + ', ' + p.short + ': ' + (STATUS_LABEL[st] || '')) + '">' + (i + 1) + '</button>';
+    const cls = isMissedWorkout(dk) ? 'missed' : p.rest && st !== 'done' ? 'rest' : st === 'today' && hasProgress(dk) ? 'partial' : st;
+    cells += '<button type="button" class="cal-cell ' + cls + (dk === today ? ' is-today' : '') + '" data-action="cal-day" data-k="' + dk + '" aria-label="' + esc(fmt(dk) + ', ' + p.short + ': ' + (STATUS_LABEL[st] || '')) + '">' + (i + 1) + (isMissedWorkout(dk) ? '<i class="xmark">&#10005;</i>' : '') + '</button>';
   }
   const head = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((x) => '<span class="cal-head">' + x + '</span>').join('');
   return '<div class="cal card"><div class="cal-top"><b>' + esc(monthStats(k).name) + ' ' + y + '</b>' +
@@ -413,6 +414,8 @@ export function daySheetHtml(k) {
     (missList.length && k <= todayKey() ? '<h3>' + (k === todayKey() ? 'Still to do' : 'Missed') + '</h3><ul class="sheet-list no">' + missList.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
     (kgRows ? '<h3>Weights</h3><ul class="sheet-kg">' + kgRows + '</ul>' : '') +
     (treatsOn(k).length ? '<h3>Junk food</h3><ul class="sheet-list no">' + treatsOn(k).map((t) => '<li>' + esc(treatInfo(t.id).name) + ', ' + num(t.kcal) + ' kcal</li>').join('') + '</ul>' : '') +
+    (isMissedWorkout(k) ? '<h3>Missed workout</h3><p class="sheet-note">Fully missed, ' + MISSED_POINTS + ' penalty points. Make-up items were added to the next 3 training days.</p>' : '') +
+    (makeupFor(k).length ? '<h3>Make-up items this day</h3><ul class="sheet-list ' + (makeupFor(k).every((it) => makeupTicked(k, it.id)) ? 'ok' : 'no') + '">' + makeupFor(k).map((it) => '<li>' + esc(it.name) + (makeupTicked(k, it.id) ? ', done' : ', not done') + '</li>').join('') + '</ul>' : '') +
     (balanceDone(k) ? '<h3>Balance plan</h3><p class="sheet-note">' + (balanceDone(k).complete ? 'Completed. Points earned back.' : (k < todayKey() ? 'Not completed: ' : 'In progress: ') + balanceDone(k).done + ' of ' + balanceDone(k).total + ' done.') + '</p>' : '') +
     ((d.note || '').trim() ? '<h3>Note</h3><p class="sheet-note">' + esc(d.note) + '</p>' : '') +
     (!doneList.length && !kgRows && !(d.note || '').trim() && k <= todayKey() ? '<p class="muted">Nothing logged on this day.</p>' : '') +
@@ -521,11 +524,16 @@ function balanceCard(k) {
   let rows = '';
   b.tasks.forEach((t) => {
     const done = bd.tasks.find((x) => x.id === t.id).done;
-    if (t.kind === 'steps') rows += row(done, 'Walk ' + num(t.steps) + ' extra steps', 'Step goal today is ' + num(stepGoalFor(k)) + ', you have ' + num(steps) + '. Ticks itself from the steps box. About ' + t.kcal + ' kcal.');
+    if (t.kind === 'steps') rows += row(done, 'Walk ' + num(t.steps) + ' extra steps', 'Step goal today is ' + num(stepGoalFor(k)) + ', you have ' + num(steps) + '. Tick it when done, or it ticks itself from the steps box. About ' + t.kcal + ' kcal.',
+      '<button type="button" class="tick' + (done ? ' on' : '') + '" data-action="balance-tick" data-id="' + t.id + '" role="checkbox" aria-checked="' + done + '" aria-label="Extra steps done"></button>');
     else rows += row(done, t.act.name + ', ' + t.minutes + ' min', esc(t.act.how) + ' About ' + t.kcal + ' kcal.',
       '<button type="button" class="tick' + (ticks[t.id] ? ' on' : '') + '" data-action="balance-tick" data-id="' + t.id + '" role="checkbox" aria-checked="' + !!ticks[t.id] + '" aria-label="' + esc(t.act.name) + ' done"></button>');
   });
-  if (b.noJunk) rows += row(bd.tasks.find((t) => t.id === 'nojunk').done, 'No junk today', 'Tick "No sugar, cold drinks or fried snacks" in habits.');
+  if (b.noJunk) {
+    const nj = bd.tasks.find((t) => t.id === 'nojunk').done;
+    rows += row(nj, 'No junk today', 'Tick at the end of the day if you stayed clean. Same as the habit below.',
+      '<button type="button" class="tick' + (nj ? ' on' : '') + '" data-action="habit" data-id="nojunk" role="checkbox" aria-checked="' + nj + '" aria-label="No junk today"></button>');
+  }
   const state = bd.complete ? '<p class="bal-ok">Balance done. Points earned back.</p>' : k < today ? '<p class="bal-miss">Not completed. These points stay owed.</p>' : '';
   return '<div class="balance card' + (bd.complete ? ' complete' : '') + '"><div class="bal-head"><span class="bal-tag">Balance plan</span><span class="bal-n">' + bd.done + '/' + bd.total + '</span></div>' +
     '<p class="bal-from"><b>Why:</b> ' + why + '. Burn back about ' + b.kcal + ' kcal today, roughly 30% of it. Activities change every day.</p>' +
@@ -547,6 +555,32 @@ function badgeSection() {
   const list = badges(), got = list.filter((b) => b.on).length;
   return '<h2>Badges <span class="h-note">' + got + ' of ' + list.length + ' earned</span></h2><div class="badges">' + list.map((b) =>
     '<div class="badge' + (b.on ? ' on' : '') + '"><span class="bd-i" aria-hidden="true"></span><b>' + esc(b.name) + '</b><small>' + esc(b.desc) + '</small></div>').join('') + '</div>';
+}
+
+// Make-up items from a fully missed workout day, shown at the top of the workout.
+function makeupCard(k) {
+  const list = makeupFor(k);
+  if (!list.length) return '';
+  const done = list.filter((it) => makeupTicked(k, it.id)).length, today = todayKey();
+  const from = Array.from(new Set(list.map((it) => DAY_NAMES[dow(it.from)] + ' (' + planFor(it.from).short + ')'))).join(', ');
+  const rows = list.map((it) => {
+    const on = makeupTicked(k, it.id);
+    return '<li class="' + (on ? 'done' : '') + '"><span class="bt" aria-hidden="true"></span><div><b>' + esc(it.name) + '</b><small>' + esc(it.detail) + '</small></div>' +
+      '<button type="button" class="tick' + (on ? ' on' : '') + '" data-action="makeup-tick" data-id="' + it.id + '" role="checkbox" aria-checked="' + on + '" aria-label="' + esc(it.name) + ' done"></button></li>';
+  }).join('');
+  return '<div class="balance makeup card' + (done === list.length ? ' complete' : '') + '"><div class="bal-head"><span class="bal-tag mk">Make-up for missed workout</span><span class="bal-n">' + done + '/' + list.length + '</span></div>' +
+    '<p class="bal-from"><b>Why:</b> you fully missed ' + esc(from) + '. Its main lifts and some cardio are spread over the next 3 training days. Do them along with today\'s workout to earn the points back.</p>' +
+    '<ul class="bal-list">' + rows + '</ul>' + (done === list.length ? '<p class="bal-ok">Make-up done for today.</p>' : k < today ? '<p class="bal-miss">Not completed.</p>' : '') + '</div>';
+}
+
+function missedSection(mw) {
+  if (!mw.items.length) return '<h2>Missed workouts</h2><div class="card treatsum"><b>No full misses this week.</b><span class="muted small">A day only counts as missed when nothing at all was done.</span></div>';
+  return '<h2>Missed workouts</h2><div class="card treatsum"><div class="pen-tiles">' +
+    '<div><span>Penalty</span><b>' + mw.points + '</b></div><div><span>Earned back</span><b>' + mw.back + '</b></div>' +
+    '<div class="' + (mw.net > 0 ? 'owe' : 'ok') + '"><span>Still owed</span><b>' + mw.net + '</b></div></div>' +
+    '<ul class="treats">' + mw.items.map((t) => '<li><span>' + DAY_SHORT[dow(t.k)] + ' &middot; ' + esc(t.name) + '<small class="tstat ' + t.status + '">' +
+      (t.status === 'done' ? 'Make-up done' : t.status === 'pending' ? 'Make-up on ' + t.days.map((x) => DAY_SHORT[dow(x)]).join(', ') : 'Make-up not completed') + '</small></span>' +
+      '<small>' + t.done + ' of ' + t.total + ' done, ' + t.earned + ' back</small></li>').join('') + '</ul></div>';
 }
 
 function junkSection(pen) {
