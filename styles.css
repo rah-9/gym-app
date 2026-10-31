@@ -957,3 +957,12 @@ button.cal-cell:active { transform: scale(0.94); }
 .makeup { border-color: rgba(242, 120, 154, 0.35); background: linear-gradient(135deg, rgba(242, 120, 154, 0.10), rgba(255, 255, 255, 0.02)), var(--surface); }
 .bal-tag.mk { color: #f6a9bf; }
 .makeup.complete { border-color: rgba(255, 255, 255, 0.25); }
+
+/* Week strip: two-line workout labels so long names never overlap */
+.strip { gap: 3px; }
+.day .df { font-size: 10px; line-height: 1.2; text-align: center; min-height: 2.4em; max-width: 100%; padding: 0 1px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; letter-spacing: 0.01em; }
+@media (max-width: 370px) {
+  .weeknav { gap: 2px; }
+  .weeknav .arrow { width: 22px; min-width: 22px; }
+  .day .df { font-size: 9px; letter-spacing: 0; text-overflow: clip; }
+}

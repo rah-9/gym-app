@@ -139,7 +139,7 @@ function weekStrip(k) {
   const html = weekDays(weekStartOf(k)).map((dk) => {
     const st = isMissedWorkout(dk) ? 'missed' : dayStatus(dk), p = planFor(dk);
     return '<button type="button" class="day ' + st + (dk === k ? ' sel' : '') + (dk === today ? ' is-today' : '') + '" data-action="pick" data-k="' + dk + '">' +
-      '<span class="dn">' + DAY_SHORT[dow(dk)] + '</span><span class="dd">' + fromKey(dk).getDate() + (isMissedWorkout(dk) ? '<i class="xmark" aria-label="missed">&#10005;</i>' : '') + '</span><span class="df" style="--dc:' + dayColor(dk) + '">' + p.short + '</span></button>';
+      '<span class="dn">' + DAY_SHORT[dow(dk)] + '</span><span class="dd">' + fromKey(dk).getDate() + (isMissedWorkout(dk) ? '<i class="xmark" aria-label="missed">&#10005;</i>' : '') + '</span><span class="df" style="--dc:' + dayColor(dk) + '">' + p.short.split('+').map(esc).join('<br>') + '</span></button>';
   }).join('');
   return '<div class="weeknav"><button type="button" class="arrow" data-action="shift" data-n="-7" aria-label="Previous week">&#8249;</button>' +
     '<div class="strip">' + html + '</div>' +
@@ -226,7 +226,7 @@ function reminderHtml() {
   const y = addDays(today, -1), py = planFor(y);
   if (!py.rest && counts(y)) {
     const sy = dayStats(y);
-    if (isMissedWorkout(y)) msgs.push('Yesterday (' + DAY_NAMES[dow(y)] + ', ' + py.focus + ') was fully missed. Make-up items were added to your next 3 training days.');
+    if (isMissedWorkout(y)) msgs.push('Yesterday (' + DAY_NAMES[dow(y)] + ', ' + py.focus + ') was fully missed. Its make-up items are on your next training days.');
     else if (sy.done === 0) msgs.push('Yesterday (' + DAY_NAMES[dow(y)] + ', ' + py.focus + ') was missed. No stress, today counts.');
     else if (sy.pct < 100) msgs.push('Yesterday was ' + sy.pct + '% done. ' + (sy.total - sy.done) + ' items were left.');
   }
