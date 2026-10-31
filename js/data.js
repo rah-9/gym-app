@@ -180,6 +180,125 @@ const LEG_DAY = {
   ]
 };
 
+/* ---------- Balanced week from 1 Nov 2026 (intermediate) ----------
+   Every muscle is trained twice a week (research: 2x beats 1x for growth),
+   about 10 to 20 hard sets per muscle per week, Sunday rest.
+   Main lifts: 4 sets, stop 1 to 2 reps before failure. Isolation: last set close to failure.
+   Supersets (same tag, e.g. A1 + A2): do one set of each back to back, then rest. Saves time, keeps the heart rate up. */
+
+// Monday: chest (heavy) + triceps + side delts + abs
+const PUSH_A = {
+  key: 'pushA',
+  focus: 'Chest + Triceps',
+  short: 'Chest',
+  cardio: { name: 'Incline treadmill walk', detail: '20 min, incline 8 to 12, speed 4.5 to 5.5 km/h' },
+  exercises: [
+    ex('flat-press', 'Flat chest press, heavy', 'Plate loaded chest press (flat bench, red arms)', 4, '6-8', 150, 'Main lift. Add weight when you hit 8 on all sets. Shoulder blades back.', 'plate+loaded+iso+lateral+bench+press'),
+    ex('incline-smith', 'Incline press', 'Smith machine + bench at 30 degrees', 3, '8-10', 120, 'Bar to upper chest, 30 degrees hits the upper chest best.', 'smith+machine+incline+bench+press+form'),
+    ex('cable-fly', 'Cable crossover, high to low', 'Cable crossover, both pulleys high', 3, '12-15', 60, 'Big stretch, hands meet at belly button level.', 'cable+crossover+high+to+low+form'),
+    ex('db-lateral', 'Dumbbell lateral raise', 'Dumbbells', 3, '12-15', 45, 'Pinkies slightly up, stop at shoulder height. Last set close to failure.', 'dumbbell+lateral+raise+form'),
+    ex('tri-press', 'Triceps press, heavy (A1)', 'Triceps press / seated dip machine', 3, '8-10', 0, 'Superset A: go straight to the overhead extension.', 'plate+loaded+seated+dip+machine+triceps'),
+    ex('oh-ext', 'Seated overhead dumbbell extension (A2)', 'Bench upright + one dumbbell', 3, '10-12', 75, 'Deep stretch behind the head grows the long head most. Rest after this one.', 'seated+overhead+dumbbell+tricep+extension'),
+    ex('cable-crunch', 'Kneeling cable crunch', 'Cable pulley high, rope', 3, '12-15', 45, 'Round the spine, elbows to knees. Hips stay still.', 'kneeling+cable+crunch+form'),
+    ex('chest-press', 'Seated chest press, pump', 'Chest press machine (pin stack)', 2, '15', 60, 'Light finisher.', 'seated+chest+press+machine+form', 1),
+    ex('straight-bar', 'Straight bar pushdown', 'Cable pulley, straight bar', 2, '15', 45, 'Squeeze 1 second at the bottom.', 'straight+bar+tricep+pushdown+form', 2)
+  ]
+};
+
+// Tuesday: back width + biceps + rear delts
+const PULL_A = {
+  key: 'pullA',
+  focus: 'Back + Biceps',
+  short: 'Back',
+  cardio: { name: 'Spin bike intervals', detail: '15 min: 8 rounds of 30 sec hard + 60 sec easy, then easy spin' },
+  exercises: [
+    ex('front-lat', 'Front lat pulldown, heavy', 'Plate loaded front lat pulldown (knee pads)', 4, '8-10', 120, 'Main lift. Chest up, pull elbows down to your ribs.', 'plate+loaded+lat+pulldown+form'),
+    ex('db-row', 'One arm dumbbell row', 'Flat bench + dumbbell', 3, '8-10 each arm', 90, 'Pull to the hip, big stretch at the bottom.', 'one+arm+dumbbell+row+form'),
+    ex('close-pull', 'Close grip pulldown', 'Cable lat pulldown, MAG grip / V-handle', 3, '10-12', 90, 'Lean back a little, squeeze the lats.', 'mag+grip+close+grip+lat+pulldown'),
+    ex('rear-delt', 'Rear delt fly, facing the pad', 'Pec Fly & Rear Delt machine', 3, '15', 45, 'Light, arms wide, pause at the back.', 'reverse+pec+deck+fly+form'),
+    ex('bar-curl', 'Barbell curl', 'EZ or straight bar from the rack', 3, '8-10', 75, 'Elbows still, no leaning back.', 'ez+bar+curl+proper+form'),
+    ex('incline-curl', 'Incline dumbbell curl', 'Bench at 45 degrees + dumbbells', 3, '10-12', 60, 'Arms hang straight down, the stretch grows the biceps.', 'incline+dumbbell+curl+form'),
+    ex('straight-arm', 'Straight arm pulldown', 'Cable pulley, straight bar', 2, '12-15', 60, 'Arms nearly straight, pull to thighs.', 'straight+arm+cable+pulldown+form', 1),
+    ex('hammer', 'Hammer curl', 'Dumbbells', 2, '12', 60, 'Palms facing each other.', 'dumbbell+hammer+curl+form', 2)
+  ]
+};
+
+// Wednesday: legs, quad focus + calves + abs
+const LEGS_A = {
+  key: 'legsA',
+  focus: 'Legs (quads) + Abs',
+  short: 'Legs',
+  cardio: { name: 'Easy bike', detail: '10 min, light, to flush the legs' },
+  exercises: [
+    ex('super-squat', 'Super squat, heavy', 'Super squat machine (red, shoulder pads)', 4, '8-10', 150, 'Main lift. Deep as you can with a flat back, knees over toes.', 'super+squat+machine+form'),
+    ex('leg-press', 'Leg press', '45 degree leg press, feet middle of the plate', 4, '10-12', 120, 'Go deep, never lock the knees.', '45+degree+leg+press+form'),
+    ex('lunges', 'Walking lunges', 'Dumbbells (or bodyweight to start)', 3, '10 each leg', 90, 'Long steps, back knee close to the floor.', 'dumbbell+walking+lunges+form'),
+    ex('leg-ext', 'Leg extension', 'Leg extension / leg curl machine', 3, '12-15', 60, 'Pause 1 second at the top, last set close to failure.', 'leg+extension+machine+form'),
+    ex('leg-curl', 'Seated leg curl', 'Same machine, curl setting', 3, '10-12', 60, 'Lean forward a little for more stretch. Control the way up.', 'seated+leg+curl+machine+form'),
+    ex('calf', 'Calf raise, pause at top', '45 degree leg press, balls of feet on the plate edge', 4, '12-15', 45, 'Full stretch at the bottom, 1 second hold at the top.', 'calf+raise+on+leg+press+form'),
+    ex('leg-raise', 'Lying leg raise', 'Flat bench or mat', 3, '12-15', 45, 'Lower back pressed down, lower slowly.', 'lying+leg+raise+form'),
+    ex('add-abd', 'Adductor, then abductor', 'Adductor / abductor machine', 2, '15 each', 45, 'Slow, no bouncing.', 'hip+adductor+abductor+machine+form', 1)
+  ]
+};
+
+// Thursday: shoulders + back (thickness and rear delts)
+const SHOULDER_BACK = {
+  key: 'shoback',
+  focus: 'Shoulders + Back',
+  short: 'Delts+Back',
+  cardio: { name: 'Incline treadmill walk', detail: '20 min, incline 8 to 12, speed 4.5 to 5.5 km/h' },
+  exercises: [
+    ex('db-press', 'Seated dumbbell shoulder press, heavy', 'Bench upright + dumbbells', 4, '8-10', 120, 'Main lift. Ranked top for front delts in EMG tests. Do not lock elbows.', 'seated+dumbbell+shoulder+press+form'),
+    ex('seated-row', 'Seated row, chest on pad, heavy', 'Plate loaded seated row', 4, '8-10', 120, 'Squeeze shoulder blades together, 1 second hold.', 'plate+loaded+seated+row+machine+form'),
+    ex('cable-lat', 'Single arm cable lateral raise', 'Cable low pulley, D-handle, cable crossing in front', 3, '12-15 each side', 45, 'Constant tension. Lead with the elbow, stop at shoulder height.', 'single+arm+cable+lateral+raise'),
+    ex('wide-pull', 'Wide grip lat pulldown', 'Cable lat pulldown, long bar', 3, '10-12', 90, 'Hands just outside shoulders, pull to upper chest.', 'wide+grip+lat+pulldown+form'),
+    ex('incline-row', 'Chest supported incline dumbbell row', 'Bench at 45 degrees + dumbbells, chest on the pad', 3, '10-12', 75, 'Elbows out wide. Hits rear delts, side delts and upper back together.', 'chest+supported+incline+dumbbell+row+form'),
+    ex('rear-delt', 'Rear delt fly, facing the pad (B1)', 'Pec Fly & Rear Delt machine', 3, '15', 0, 'Superset B: go straight to face pulls.', 'reverse+pec+deck+fly+form'),
+    ex('face-pull', 'Cable face pull (B2)', 'Cable pulley at face height, rope', 3, '15', 60, 'Pull to forehead, elbows high. Keeps shoulders healthy.', 'cable+face+pull+form'),
+    ex('shrug', 'Dumbbell shrug', 'Dumbbells', 2, '12-15', 60, 'Straight up, hold 1 second.', 'dumbbell+shrug+form', 1),
+    ex('db-lateral', 'Dumbbell lateral raise, drop set', 'Dumbbells', 1, '15 then lighter to failure', 0, 'One all-out set to finish the side delts.', 'dumbbell+lateral+raise+drop+set', 2)
+  ]
+};
+
+// Friday: upper chest + arms (supersets) + core
+const PUSH_B = {
+  key: 'chestarms',
+  focus: 'Chest + Arms',
+  short: 'Chest+Arms',
+  cardio: { name: 'Spin bike intervals', detail: '15 min: 8 rounds of 30 sec hard + 60 sec easy, then easy spin' },
+  exercises: [
+    ex('incline-db', 'Incline dumbbell press', 'Bench at 30 degrees + dumbbells', 4, '8-10', 120, 'Main lift. Upper chest. Lower to chest level, press up and in.', 'incline+dumbbell+press+form'),
+    ex('chest-press', 'Seated chest press', 'Chest press machine (pin stack)', 3, '10-12', 90, 'Smooth, full squeeze.', 'seated+chest+press+machine+form'),
+    ex('pec-fly', 'Pec fly, facing out', 'Pec Fly & Rear Delt machine', 3, '12-15', 60, 'Slight bend in elbows, squeeze in the middle.', 'pec+deck+fly+machine+form'),
+    ex('preacher-db', 'Single arm preacher curl (C1)', 'Curl machine arm pad + dumbbell', 3, '10-12 each arm', 0, 'Superset C: go straight to the rope pushdown.', 'single+arm+dumbbell+preacher+curl'),
+    ex('rope-pushdown', 'Rope pushdown (C2)', 'Cable pulley, rope', 3, '12', 60, 'Split the rope at the bottom. Rest after this one.', 'rope+tricep+pushdown+form'),
+    ex('hammer', 'Hammer curl (D1)', 'Dumbbells', 3, '10-12', 0, 'Superset D: go straight to the V-bar pushdown.', 'dumbbell+hammer+curl+form'),
+    ex('vbar', 'V-bar pushdown (D2)', 'Cable pulley, V-bar', 3, '12', 60, 'Elbows pinned to your sides.', 'v+bar+tricep+pushdown+form'),
+    ex('plank', 'Plank', 'Floor / mat', 3, '40 sec', 45, 'Straight line, squeeze glutes and abs.', 'plank+proper+form'),
+    ex('cable-lat', 'Single arm cable lateral raise', 'Cable low pulley, D-handle', 2, '15 each side', 45, 'Light pump for the side delts.', 'single+arm+cable+lateral+raise', 1),
+    ex('curl-machine', 'Machine biceps curl, pump', 'Biceps curl machine (plate loaded, red arm)', 2, '15', 45, 'Light, slow reps.', 'plate+loaded+biceps+curl+machine+form', 2)
+  ]
+};
+
+// Saturday: legs, glutes + hamstrings (no Romanian deadlift) + core
+const LEGS_B = {
+  key: 'legsB',
+  focus: 'Legs (glutes + hamstrings)',
+  short: 'Glutes',
+  cardio: { name: 'Incline treadmill walk', detail: '15 min, incline 6 to 10, steady' },
+  exercises: [
+    ex('hip-thrust', 'Smith machine hip thrust', 'Smith machine + flat bench, pad on the bar', 4, '8-10', 120, 'Replaces the Romanian deadlift. Upper back on the bench, chin tucked, squeeze glutes 1 second at the top. Easy on the lower back.', 'smith+machine+hip+thrust+form'),
+    ex('leg-curl', 'Seated leg curl, heavy', 'Leg extension / leg curl machine, curl setting', 4, '8-12', 75, 'Seated curls grow the hamstrings more than lying ones. Lean forward, slow on the way up.', 'seated+leg+curl+machine+form'),
+    ex('back-ext-glute', '45 degree back extension, glute focus', '45 degree back extension bench, hold a plate', 3, '10-12', 75, 'Round the upper back slightly, push hips into the pad with the glutes. Stop at a straight line.', '45+degree+back+extension+glute+focus'),
+    ex('leg-press-high', 'Leg press, feet high and wide', '45 degree leg press, feet at the top of the plate', 3, '10-12', 120, 'High feet shift the work to glutes and hamstrings. Do not lock knees.', 'leg+press+feet+high+wide+glutes'),
+    ex('split-squat', 'Bulgarian split squat', 'Flat bench + dumbbells (hold the Smith bar for balance if needed)', 3, '8-10 each leg', 90, 'Front foot far forward, lean the chest a little for more glutes.', 'dumbbell+bulgarian+split+squat+glutes'),
+    ex('add-abd', 'Abductor (push out), then adductor', 'Adductor / abductor machine', 3, '15 each', 45, 'Lean forward on the abductor for the upper glutes.', 'hip+adductor+abductor+machine+form'),
+    ex('calf', 'Calf raise, pause at top', '45 degree leg press, balls of feet on the plate edge', 4, '12-15', 45, 'Full stretch at the bottom.', 'calf+raise+on+leg+press+form'),
+    ex('plank', 'Plank', 'Floor / mat', 3, '40 sec', 45, 'Straight line from head to heels.', 'plank+proper+form', 1),
+    ex('leg-ext', 'Leg extension, pump', 'Leg extension / leg curl machine', 2, '15', 45, 'Light finisher for the quads.', 'leg+extension+machine+form', 2)
+  ]
+};
+
 /* What each exercise works and what it is for. Shown on every card.
    main: muscles doing most of the work. also: helpers. goal: a key from GOALS. */
 export const GOALS = {
@@ -248,6 +367,16 @@ const TARGETS = {
   'reverse-pushdown': { main: ['Triceps (inner)'], also: ['Forearms'], goal: 'muscle' },
   'plank-fri': { main: ['Core (abs)'], also: ['Shoulders', 'Lower back'], goal: 'core' },
   'goblet-squat': { main: ['Quads (front thigh)', 'Glutes'], also: ['Core'], goal: 'strength' },
+  // Added with the balanced week (1 Nov 2026)
+  'cable-crunch': { main: ['Abs'], also: ['Obliques'], goal: 'core' },
+  'leg-raise': { main: ['Lower abs'], also: ['Hip flexors'], goal: 'core' },
+  'wide-pull': { main: ['Lats (back width)'], also: ['Biceps', 'Rear shoulders'], goal: 'strength' },
+  'incline-row': { main: ['Upper back', 'Rear shoulders'], also: ['Side shoulders', 'Lats', 'Biceps'], goal: 'strength' },
+  'incline-db': { main: ['Upper chest'], also: ['Front shoulders', 'Triceps'], goal: 'strength' },
+  'hip-thrust': { main: ['Glutes'], also: ['Hamstrings', 'Core'], goal: 'strength' },
+  'back-ext-glute': { main: ['Glutes', 'Hamstrings'], also: ['Lower back'], goal: 'strength' },
+  'leg-press-high': { main: ['Glutes', 'Hamstrings'], also: ['Quads'], goal: 'strength' },
+  'split-squat': { main: ['Glutes', 'Quads'], also: ['Hamstrings', 'Core (balance)'], goal: 'strength' },
   // Cardio and rest-day tasks
   cardio: { main: ['Heart + lungs'], also: ['Legs'], goal: 'fatburn' },
   walk: { main: ['Heart + lungs'], also: ['Legs'], goal: 'fatburn' },
@@ -258,19 +387,26 @@ const TARGETS = {
 // Attach the info so every card can read e.main / e.also / e.goal.
 const attach = (o, id) => Object.assign(o, TARGETS[id] || { main: [], also: [], goal: '' });
 attach(WARMUP, 'warmup');
-[ARMS, CHEST, BACK, LEGS, CHEST_DAY, SHOULDERS, ARMS_PLUS, LEG_DAY].forEach((w) => { w.exercises.forEach((e) => attach(e, e.id)); attach(w.cardio, 'cardio'); });
+[ARMS, CHEST, BACK, LEGS, CHEST_DAY, SHOULDERS, ARMS_PLUS, LEG_DAY, PUSH_A, PULL_A, LEGS_A, SHOULDER_BACK, PUSH_B, LEGS_B].forEach((w) => { w.exercises.forEach((e) => attach(e, e.id)); attach(w.cardio, 'cardio'); });
 REST.tasks.forEach((t) => attach(t, t.id));
 
-// Every workout the schedule can use, by key.
-// The first five are the older workouts, kept so days already logged under them keep their history.
+// Older workouts stay so days logged under them keep their history.
+// They are hidden from the day pickers unless a day already uses one.
+[CHEST_DAY, ARMS, BACK, SHOULDERS, ARMS_PLUS, LEG_DAY, CHEST, LEGS].forEach((w) => { w.old = true; });
+
+// Every workout the schedule can use, by key. The balanced week comes first.
 export const WORKOUTS = {
+  pushA: PUSH_A, pullA: PULL_A, legsA: LEGS_A, shoback: SHOULDER_BACK, chestarms: PUSH_B, legsB: LEGS_B,
   chest: CHEST_DAY, arms: ARMS, back: BACK, shoulders: SHOULDERS, armsplus: ARMS_PLUS, legday: LEG_DAY,
   push: CHEST, legs: LEGS, rest: REST
 };
 
 // Default week. Index matches Date.getDay(): 0 = Sunday.
-// Mon chest, Tue arms, Wed back, Thu shoulders, Fri arms + shoulder finisher, Sat legs, Sun rest.
-export const SCHEDULE = ['rest', 'chest', 'arms', 'back', 'shoulders', 'armsplus', 'legday'];
+// Mon chest + triceps, Tue back + biceps, Wed legs (quads), Thu shoulders + back,
+// Fri chest + arms, Sat legs (glutes + hamstrings), Sun rest.
+// Each muscle twice a week: chest Mon/Fri, back Tue/Thu, shoulders Mon/Thu (+Tue rear), arms Mon/Tue/Fri, legs Wed/Sat, abs Mon/Wed/Fri.
+export const SCHEDULE = ['rest', 'pushA', 'pullA', 'legsA', 'shoback', 'chestarms', 'legsB'];
+export const PLAN_VERSION = 2;
 
 // The week used before October 2026 (Mon/Thu arms, Tue/Fri chest).
 // Old saved days without a workout stamp are read with this, so history stays correct.

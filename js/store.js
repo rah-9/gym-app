@@ -1,6 +1,6 @@
 /* All saved data: one state object in localStorage, mirrored to an IndexedDB vault
    and a second localStorage snapshot so a cleared cache can be recovered. */
-import { LEGACY_SCHEDULE, SCHEDULE, WORKOUTS } from './data.js';
+import { LEGACY_SCHEDULE, SCHEDULE, WORKOUTS, PLAN_VERSION } from './data.js';
 import { keyOf, todayKey, dow, toast } from './util.js';
 
 const KEY = 'gymlog.v1';
@@ -35,6 +35,12 @@ function normalize(src) {
     if (!d || d.plan) return;
     d.plan = k >= today && !dayHasProgress(d) ? week[dow(k)] : LEGACY_SCHEDULE[dow(k)];
   });
+  // New default week: move to it once. Logged days keep their workout.
+  if ((s.settings.planV || 1) < PLAN_VERSION) {
+    delete s.settings.schedule;
+    Object.keys(s.days).forEach((k) => { const d = s.days[k]; if (d && k >= today && !dayHasProgress(d)) d.plan = SCHEDULE[dow(k)]; });
+    s.settings.planV = PLAN_VERSION;
+  }
   return s;
 }
 

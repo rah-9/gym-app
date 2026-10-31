@@ -4,7 +4,7 @@ import { S } from './store.js';
 import {
   planFor, workoutKeyFor, schedule, dayRead, dayStats, dayStatus, hasProgress, mainExercises, bonusExercises,
   weightHint, musclesFor, nextUp, programWeek, counts, stepsPct, STEP_GOAL, STATUS_LABEL, WEEK_ORDER,
-  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, deadlineText, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek, stepGoalFor, treatDays, badges, kgHistory, makeupFor, makeupTicked, isMissedWorkout, missedWeek, MISSED_POINTS
+  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, deadlineText, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek, stepGoalFor, treatDays, badges, kgHistory, makeupFor, makeupTicked, isMissedWorkout, missedWeek, MISSED_POINTS, MAKEUP_PER_DAY, makeupQueue
 } from './plan.js';
 import { reportData, bestLabel } from './report.js';
 import * as notify from './notify.js';
@@ -15,7 +15,8 @@ export const ui = { view: 'today', selDate: todayKey(), reportWs: weekStartOf(to
 // Each workout has its own colour so every day of the week feels different.
 export const DAY_COLORS = {
   chest: '#f9a8d4', push: '#f9a8d4', arms: '#c4b5fd', back: '#a5b4fc', shoulders: '#fcd34d',
-  armsplus: '#ddd6fe', legday: '#93c5fd', legs: '#93c5fd', rest: '#cbd5e1'
+  armsplus: '#ddd6fe', legday: '#93c5fd', legs: '#93c5fd', rest: '#cbd5e1',
+  pushA: '#f9a8d4', pullA: '#a5b4fc', legsA: '#93c5fd', shoback: '#c4b5fd', chestarms: '#fbcfe8', legsB: '#7dd3fc'
 };
 const dayColor = (k) => DAY_COLORS[workoutKeyFor(k)] || '#b9a8ff';
 
@@ -63,7 +64,7 @@ export function stepsNote(v, goal) {
   return num(g - n) + ' more to reach ' + num(g) + '.' + why;
 }
 
-const workoutOptions = (selected) => Object.values(WORKOUTS)
+const workoutOptions = (selected) => Object.values(WORKOUTS).filter((w) => !w.old || w.key === selected)
   .map((w) => '<option value="' + w.key + '"' + (w.key === selected ? ' selected' : '') + '>' + esc(w.focus) + '</option>').join('');
 
 /* ---------- Today ---------- */
@@ -123,7 +124,7 @@ function exerciseCard(e, d, isBonus, isNext) {
     '<button type="button" class="ex-main" data-action="expand" data-id="' + esc(e.id) + '" aria-expanded="' + open + '">' +
     '<span class="ex-text">' + (isNext ? '<span class="upnext">Up next</span>' : '') +
     '<span class="name">' + (isBonus ? '<span class="tag">Bonus</span>' : '') + esc(e.name) + '</span>' +
-    '<span class="ex-sub"><b>' + dosage + '</b>' + (e.rest ? '<span>rest ' + restLabel(e.rest) + '</span>' : '') + '</span>' +
+    '<span class="ex-sub"><b>' + dosage + '</b>' + (e.rest ? '<span>rest ' + restLabel(e.rest) + '</span>' : /\([A-D]1\)/.test(e.name) ? '<span>superset, no rest</span>' : '') + '</span>' +
     (done && !open ? '' : '<span class="machine">' + esc(e.machine) + '</span>') + '</span>' +
     '<span class="chev" aria-hidden="true"></span></button></div>' + tools + more + '</li>';
 }
@@ -414,7 +415,7 @@ export function daySheetHtml(k) {
     (missList.length && k <= todayKey() ? '<h3>' + (k === todayKey() ? 'Still to do' : 'Missed') + '</h3><ul class="sheet-list no">' + missList.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
     (kgRows ? '<h3>Weights</h3><ul class="sheet-kg">' + kgRows + '</ul>' : '') +
     (treatsOn(k).length ? '<h3>Junk food</h3><ul class="sheet-list no">' + treatsOn(k).map((t) => '<li>' + esc(treatInfo(t.id).name) + ', ' + num(t.kcal) + ' kcal</li>').join('') + '</ul>' : '') +
-    (isMissedWorkout(k) ? '<h3>Missed workout</h3><p class="sheet-note">Fully missed, ' + MISSED_POINTS + ' penalty points. Make-up items were added to the next 3 training days.</p>' : '') +
+    (isMissedWorkout(k) ? '<h3>Missed workout</h3><p class="sheet-note">Fully missed, ' + MISSED_POINTS + ' penalty points. Its make-up items (2 main lifts + 15 min cardio) go on your next training days, up to ' + MAKEUP_PER_DAY + ' a day.</p>' : '') +
     (makeupFor(k).length ? '<h3>Make-up items this day</h3><ul class="sheet-list ' + (makeupFor(k).every((it) => makeupTicked(k, it.id)) ? 'ok' : 'no') + '">' + makeupFor(k).map((it) => '<li>' + esc(it.name) + (makeupTicked(k, it.id) ? ', done' : ', not done') + '</li>').join('') + '</ul>' : '') +
     (balanceDone(k) ? '<h3>Balance plan</h3><p class="sheet-note">' + (balanceDone(k).complete ? 'Completed. Points earned back.' : (k < todayKey() ? 'Not completed: ' : 'In progress: ') + balanceDone(k).done + ' of ' + balanceDone(k).total + ' done.') + '</p>' : '') +
     ((d.note || '').trim() ? '<h3>Note</h3><p class="sheet-note">' + esc(d.note) + '</p>' : '') +
@@ -563,13 +564,14 @@ function makeupCard(k) {
   if (!list.length) return '';
   const done = list.filter((it) => makeupTicked(k, it.id)).length, today = todayKey();
   const from = Array.from(new Set(list.map((it) => DAY_NAMES[dow(it.from)] + ' (' + planFor(it.from).short + ')'))).join(', ');
+  const waiting = k >= today ? makeupQueue(k) : 0;
   const rows = list.map((it) => {
     const on = makeupTicked(k, it.id);
     return '<li class="' + (on ? 'done' : '') + '"><span class="bt" aria-hidden="true"></span><div><b>' + esc(it.name) + '</b><small>' + esc(it.detail) + '</small></div>' +
       '<button type="button" class="tick' + (on ? ' on' : '') + '" data-action="makeup-tick" data-id="' + it.id + '" role="checkbox" aria-checked="' + on + '" aria-label="' + esc(it.name) + ' done"></button></li>';
   }).join('');
   return '<div class="balance makeup card' + (done === list.length ? ' complete' : '') + '"><div class="bal-head"><span class="bal-tag mk">Make-up for missed workout</span><span class="bal-n">' + done + '/' + list.length + '</span></div>' +
-    '<p class="bal-from"><b>Why:</b> you fully missed ' + esc(from) + '. Its main lifts and some cardio are spread over the next 3 training days. Do them along with today\'s workout to earn the points back.</p>' +
+    '<p class="bal-from"><b>Why:</b> you fully missed ' + esc(from) + '. Every missed day costs ' + MISSED_POINTS + ' points and gets its own make-up: 2 main lifts + 15 min cardio, up to ' + MAKEUP_PER_DAY + ' items a day on your next training days. Skip a day and its items move to the next one.' + (waiting ? ' <b>' + waiting + ' more waiting after today.</b>' : '') + '</p>' +
     '<ul class="bal-list">' + rows + '</ul>' + (done === list.length ? '<p class="bal-ok">Make-up done for today.</p>' : k < today ? '<p class="bal-miss">Not completed.</p>' : '') + '</div>';
 }
 
@@ -702,7 +704,9 @@ function renderPlan() {
     scheduleEditor() +
     '<h2>Workouts</h2>' + workoutList() +
     '<h2>Watch list <span class="h-note">how to do each exercise</span></h2>' + watchList() +
-    '<h2>Rules</h2><ul class="plain"><li>Last 1 to 2 reps hard, form clean. Never to failure for now.</li>' +
+    '<h2>Rules</h2><ul class="plain"><li>Every muscle is trained twice a week: chest Mon + Fri, back Tue + Thu, shoulders Mon + Thu, arms Mon, Tue + Fri, legs Wed + Sat, abs Mon, Wed + Fri.</li>' +
+    '<li>Main lifts (marked heavy): stop 1 to 2 reps before failure. Isolation moves: take the last set close to failure, form clean.</li>' +
+    '<li>Supersets (A1 + A2): one set of each back to back, then rest. Saves time and keeps the heart rate up for fat burn.</li>' +
     '<li>Hit the top reps on every set, then add the smallest weight jump next time.</li>' +
     '<li>Never lock knees on leg press. Keep your back flat on every row and pulldown.</li>' +
     '<li>Every 6 to 8 weeks, one easy week at half the sets.</li></ul>' + goalLegend() +

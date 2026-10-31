@@ -7,13 +7,16 @@ Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
 
 - PIN lock (4 digits). Opens as soon as the 4th digit is right, then stays open for 12 hours on that phone.
 - Today tab: the checklist for today's weekday. Every new day starts a fresh list.
-  - Monday: chest + a little shoulder
-  - Tuesday: biceps + triceps
-  - Wednesday: back + light legs
-  - Thursday: shoulders + a little upper chest
-  - Friday: arms (different moves from Tuesday) + shoulder finisher + plank
-  - Saturday: legs only
+  - Balanced intermediate week (from 1 Nov 2026), every muscle twice a week:
+  - Monday: chest (heavy) + triceps + side delts + abs
+  - Tuesday: back width + biceps + rear delts
+  - Wednesday: legs, quad focus + calves + abs
+  - Thursday: shoulders + back (thickness, rear delts)
+  - Friday: upper chest + arms in supersets + plank
+  - Saturday: legs, glutes + hamstrings (Smith hip thrust and 45 degree back extension instead of the Romanian deadlift)
   - Sunday: rest day (walk, weigh in, stretch)
+  - Main lifts are 4 sets, stopping 1 to 2 reps before failure. Supersets are marked A1 + A2.
+  - Older workouts stay in the app for history and are hidden from the pickers.
   - Change any day in Plan > Your week. Before you tick anything, you can also switch a single day's workout from the Today card.
     Days you already logged keep the workout they were logged under, so changing the week never rewrites history.
 - Each exercise card shows what it works (main muscles, helper muscles) and a goal tag:
@@ -22,6 +25,8 @@ Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
 - If you finished every set last time, the kg box suggests the next small step up (+2.5 kg, or +1 kg under 10 kg).
 - Each exercise card: tick box, set buttons (tapping a set starts the rest timer), kg box.
 - Bonus exercises are shown every day under the main workout. Do them when your body allows; they do not lower your score if skipped.
+- Missed workouts: a training day with nothing real done costs 5 points and gets its own make-up (2 main lifts + 15 min cardio).
+  Several missed days in a row each get theirs, queued on the next training days, up to 3 items a day. A skipped make-up day passes its items on.
 - Reminder card when you open the app: yesterday missed or half done, morning window (6 to 10 AM) passed with nothing ticked, or items still left for an evening session.
 - Each kg box shows what you lifted last time, so you can add weight step by step.
 - Watch how to do it link under every exercise, plus a full Watch list in the Plan tab.

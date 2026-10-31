@@ -536,11 +536,7 @@ export function kgHistory(id, upTo, n) {
    At most 2 make-up items land on one day so it stays doable. Finishing them earns the points back. */
 export const MISSED_POINTS = 5;
 
-function nextTrainingDays(k, n) {
-  const out = [];
-  for (let i = 1; i <= 14 && out.length < n; i++) { const kk = addDays(k, i); if (!planFor(kk).rest) out.push(kk); }
-  return out;
-}
+export const MAKEUP_PER_DAY = 3;
 
 export function isMissedWorkout(k) {
   const first = firstWorkoutDay();
@@ -549,39 +545,72 @@ export function isMissedWorkout(k) {
 
 function makeupItems(m) {
   const p = planFor(m);
-  const lifts = mainExercises(p).filter((e) => e.id !== 'warmup' && !/plank/.test(e.id)).slice(0, 2);
+  const lifts = mainExercises(p).filter((e) => e.id !== 'warmup' && !/plank|crunch|leg-raise/.test(e.id)).slice(0, 2);
   const items = lifts.map((e) => ({ kind: 'ex', exId: e.id, name: e.name, detail: e.sets + ' x ' + e.reps + ', ' + e.machine }));
   items.push({ kind: 'cardio', name: 'Extra cardio, 15 min', detail: (p.cardio ? p.cardio.name : 'Incline walk or spin bike') + ', easy to moderate pace' });
-  const days = nextTrainingDays(m, items.length);
-  return items.map((it, i) => Object.assign(it, { id: 'mk-' + m + '-' + i, from: m, day: days[i] }));
+  return items.map((it, i) => Object.assign(it, { id: 'mk-' + m + '-' + i, from: m }));
+}
+
+/* Every missed day gets its own make-up items, placed in a queue:
+   oldest missed day first, next training days after it, up to MAKEUP_PER_DAY a day.
+   A day you also miss passes its items on to the next training day, so nothing is dropped.
+   An item you already ticked stays on the day you ticked it. */
+let mkCache = null;
+function makeupPlan() {
+  const today = todayKey();
+  const sig = today + '|' + JSON.stringify(S.settings.schedule || '') + '|' + Object.keys(S.days).length + '|' +
+    Object.keys(S.days).filter((k) => k >= addDays(today, -150)).map((k) => { const d = S.days[k]; return k + (d.plan || "") + (workedOut(k) ? 1 : 0) + JSON.stringify(d.makeupDone || {}); }).join(',');
+  if (mkCache && mkCache.sig === sig) return mkCache;
+  const first = firstWorkoutDay();
+  const byDay = {}, items = [];
+  if (first) {
+    let m = first > addDays(today, -150) ? first : addDays(today, -150);
+    for (; m < today; m = addDays(m, 1)) {
+      if (!isMissedWorkout(m)) continue;
+      makeupItems(m).forEach((it) => {
+        let day = null;
+        for (let i = 1; i <= 45 && !day; i++) { const kk = addDays(m, i); if (makeupTicked(kk, it.id)) day = kk; }
+        for (let i = 1; i <= 60 && !day; i++) {
+          const kk = addDays(m, i);
+          if (planFor(kk).rest || isMissedWorkout(kk)) continue;
+          if ((byDay[kk] || []).length >= MAKEUP_PER_DAY) continue;
+          day = kk;
+        }
+        it.day = day;
+        if (day) (byDay[day] = byDay[day] || []).push(it);
+        items.push(it);
+      });
+    }
+  }
+  mkCache = { sig, byDay, items };
+  return mkCache;
 }
 
 // Make-up items due on day k.
 export function makeupFor(k) {
-  const out = [];
-  for (let i = 1; i <= 12; i++) {
-    const m = addDays(k, -i);
-    if (!isMissedWorkout(m)) continue;
-    makeupItems(m).forEach((it) => { if (it.day === k) out.push(it); });
-  }
-  return out.slice(0, 2);
+  return (makeupPlan().byDay[k] || []).slice();
+}
+// Make-up items still queued on days after k.
+export function makeupQueue(k) {
+  return makeupPlan().items.filter((it) => it.day && it.day > k).length;
 }
 export const makeupTicked = (k, id) => !!(((S.days[k] || {}).makeupDone || {})[id]);
 
 // Missed workout days in a week with their make-up progress.
 export function missedWeek(ws) {
   const today = todayKey();
+  const all = makeupPlan().items;
   const items = [];
   let points = 0, back = 0;
   for (let i = 0; i < 7; i++) {
     const m = addDays(ws, i);
     if (!isMissedWorkout(m)) continue;
-    const mk = makeupItems(m);
-    const done = mk.filter((it) => makeupTicked(it.day, it.id)).length;
-    const pending = mk.some((it) => it.day >= today && !makeupTicked(it.day, it.id));
-    const earned = Math.round(MISSED_POINTS * done / mk.length);
+    const mk = all.filter((it) => it.from === m);
+    const done = mk.filter((it) => it.day && makeupTicked(it.day, it.id)).length;
+    const pending = mk.some((it) => it.day && it.day >= today && !makeupTicked(it.day, it.id));
+    const earned = mk.length ? Math.round(MISSED_POINTS * done / mk.length) : 0;
     points += MISSED_POINTS; back += earned;
-    items.push({ k: m, name: planFor(m).focus, done, total: mk.length, earned, status: done === mk.length ? 'done' : pending ? 'pending' : 'owed', days: mk.map((it) => it.day) });
+    items.push({ k: m, name: planFor(m).focus, done, total: mk.length, earned, status: done === mk.length ? 'done' : pending ? 'pending' : 'owed', days: mk.map((it) => it.day).filter(Boolean) });
   }
   return { items, points, back, net: points - back };
 }
