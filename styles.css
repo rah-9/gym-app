@@ -1037,3 +1037,8 @@ button.cal-cell:active { transform: scale(0.94); }
 .protein details.fold { margin: 0; }
 .vol-fill.prog { background: var(--ink-2); }
 .vol-range { border-radius: 2px; }
+.deload-ask { border-color: rgba(245, 196, 81, 0.35); }
+.deload-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; }
+.deload-row p { margin: 2px 0 0; }
+.deload-row .small-btn { margin-top: 0; flex: none; }
+.mode-tag + .linkbtn { display: inline; margin-left: 4px; }

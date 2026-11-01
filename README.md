@@ -16,7 +16,7 @@ Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
   - Saturday: legs, glutes + hamstrings (Smith hip thrust and 45 degree back extension instead of the Romanian deadlift)
   - Sunday: rest day (walk, weigh in, stretch)
   - Effort in reps in reserve (RIR): heavy lifts stop 1 to 3 reps short of failure, isolation moves 0 to 2 short. Supersets are marked A1 + A2.
-  - Every 7th program week is a deload: half the sets, same weights. The app applies it by itself.
+  - Every 7th program week a deload (half the sets, same weights) is suggested. You choose yes or no at the start of that week, or turn one on any week from Plan.
   - Older workouts stay in the app for history and are hidden from the pickers.
   - Change any day in Plan > Your week. Before you tick anything, you can also switch a single day's workout from the Today card.
     Days you already logged keep the workout they were logged under, so changing the week never rewrites history.

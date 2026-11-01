@@ -88,7 +88,7 @@ export function weekCheck(ws) {
     days: list.length, sleep: avg('sleep'), sore: avg('sore'), energy: avg('energy'),
     painDays: list.filter((c) => c.pain === 1).length,
     lighterDays: weekDays(ws).filter((k) => dayRead(k).lighter).length,
-    deload: isDeload(ws)
+    deload: weekDays(ws).some(isDeload)
   };
 }
 

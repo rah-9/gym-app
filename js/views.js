@@ -4,7 +4,7 @@ import { S } from './store.js';
 import {
   planFor, workoutKeyFor, schedule, dayRead, dayStats, dayStatus, hasProgress, mainExercises, bonusExercises,
   weightHint, musclesFor, nextUp, programWeek, counts, stepsPct, STEP_GOAL, STATUS_LABEL, WEEK_ORDER,
-  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, deadlineText, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek, stepGoalFor, treatDays, badges, kgHistory, makeupFor, makeupTicked, isMissedWorkout, missedWeek, MISSED_POINTS, MAKEUP_PER_DAY, makeupQueue, repTop, isDeload, dayMode, DELOAD_EVERY
+  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, deadlineText, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek, stepGoalFor, treatDays, badges, kgHistory, makeupFor, makeupTicked, isMissedWorkout, missedWeek, MISSED_POINTS, MAKEUP_PER_DAY, makeupQueue, repTop, isDeload, dayMode, DELOAD_EVERY, deloadSuggested, deloadChoice
 } from './plan.js';
 import { weekVolume, CHECK_FIELDS, checkOf, checkComplete, lighterReasons, weekCheck, strengthTrend, dayE1rm, dayActive, weekActive, FOODS, foodInfo, dayProtein, proteinTarget, weekProtein, calorieTarget, latestWeight, ACTIVITY, PROTEIN_PER_KG } from './track.js';
 import { reportData, bestLabel } from './report.js';
@@ -305,7 +305,7 @@ function renderToday() {
     opt('next', nextK ? 'Next ' + esc(p.short) + ', ' + DAY_SHORT[dow(nextK)] : 'Next time') + opt('tomorrow', 'Tomorrow') + opt('off', 'Off') + '</span></div>';
   if (k !== today) body += '<button type="button" class="ghost wide" data-action="pick" data-k="' + today + '">Back to today</button>';
 
-  return weekStrip(k) + (k === today ? notifyPrompt() + reminderHtml() : '') + hero(k) + (k <= today ? checkCard(k) : '') + body;
+  return weekStrip(k) + (k === today ? notifyPrompt() + reminderHtml() : '') + (k === today ? deloadPrompt(k) : '') + hero(k) + (k <= today ? checkCard(k) : '') + body;
 }
 
 /* ---------- Report ---------- */
@@ -715,9 +715,9 @@ function renderPlan() {
     '<li>Supersets (A1 + A2): one set of each back to back, then rest. Saves time and keeps the heart rate up for fat burn.</li>' +
     '<li>Hit the top reps on every set, then add the smallest weight jump next time.</li>' +
     '<li>Never lock knees on leg press. Keep your back flat on every row and pulldown.</li>' +
-    '<li>Every ' + DELOAD_EVERY + 'th week is a deload: half the sets, same weights. The app does it for you.' + nextDeloadText() + '</li>' +
+    '<li>Every ' + DELOAD_EVERY + 'th week a deload is suggested: half the sets, same weights. You choose at the start of that week, or turn one on below any time.' + nextDeloadText() + '</li>' +
     '<li>Bad sleep, very sore, low energy or joint pain? The daily check-in offers a lighter day: one set less on everything.</li></ul>' + goalLegend() +
-    volumeSection(weekVolume(weekStartOf(todayKey())), 'plan') + numbersSection() +
+    deloadPlanRow() + volumeSection(weekVolume(weekStartOf(todayKey())), 'plan') + numbersSection() +
     remindSection() + notifySection() + dataSection();
 }
 
@@ -753,17 +753,34 @@ function effortRow(e, d) {
 
 function modeTag(k, p) {
   if (p.rest) return '';
-  if (isDeload(k)) return '<div class="mode-tag deload">Deload week &middot; half the sets, same weights</div>';
+  if (isDeload(k)) return '<div class="mode-tag deload">Deload week &middot; half the sets, same weights</div>' +
+    (k >= todayKey() ? ' <button type="button" class="linkbtn" data-action="deload" data-v="0">Turn off</button>' : '');
   if (dayMode(k) === 'light') return '<div class="mode-tag light">Lighter day &middot; one set less on each exercise</div>';
   return '';
+}
+
+// Start-of-week choice on a suggested deload week.
+function deloadPrompt(k) {
+  if (!deloadSuggested(k) || deloadChoice(k)) return '';
+  return '<div class="notice deload-ask" role="status"><div class="notice-text"><p><b>Deload week suggested</b> (week ' + programWeek(k) + ')</p>' +
+    '<p class="muted">Half the sets on every exercise, same weights, so joints and muscles fully recover and you come back stronger. Your call.</p></div>' +
+    '<div class="notice-actions"><button type="button" data-action="deload" data-v="1">Deload this week</button>' +
+    '<button type="button" class="quiet" data-action="deload" data-v="0">Train normal</button></div></div>';
+}
+
+function deloadPlanRow() {
+  const t = todayKey(), on = isDeload(t), c = deloadChoice(t);
+  return '<div class="card deload-row"><div><b>Deload this week</b><p class="muted small">' +
+    (on ? 'On from ' + fmt(c.from) + '. Half the sets, same weights.' : deloadSuggested(t) ? 'Suggested this week. You decide.' : 'Not needed this week, but you can take one if you feel run down.') + '</p></div>' +
+    '<button type="button" class="' + (on ? 'ghost' : 'primary') + ' small-btn" data-action="deload" data-v="' + (on ? 0 : 1) + '">' + (on ? 'Turn off' : 'Turn on') + '</button></div>';
 }
 
 function nextDeloadText() {
   const wk = programWeek(todayKey());
   if (!wk) return '';
   const left = DELOAD_EVERY - (wk % DELOAD_EVERY);
-  if (left === DELOAD_EVERY) return ' This week is a deload week.';
-  return ' Next one in ' + left + (left === 1 ? ' week.' : ' weeks.');
+  if (left === DELOAD_EVERY) return ' This week is a suggested deload week.';
+  return ' Next suggestion in ' + left + (left === 1 ? ' week.' : ' weeks.');
 }
 
 // Daily check-in: sleep, soreness, energy, joint pain. Offers a lighter day when recovery is poor.

@@ -1,6 +1,6 @@
 /* App start-up and all tap/typing handlers. */
 import { S, save, backupNow, checkBackupSchedule, autoRestore, restoreLatest, importBackup, exportBackup, wipeAll, requestPersistentStorage } from './store.js';
-import { planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct, streak, monthStats, bestKg, sessionMinutes, EX_NAMES, WATER_GOAL, noteTarget, treatInfo, treatPoints, ptsLabel, balanceFor, stepGoalFor, treatDays } from './plan.js';
+import { setDeload, isDeload, planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct, streak, monthStats, bestKg, sessionMinutes, EX_NAMES, WATER_GOAL, noteTarget, treatInfo, treatPoints, ptsLabel, balanceFor, stepGoalFor, treatDays } from './plan.js';
 import { reportData, reportText, docReport, pdfReport } from './report.js';
 import { foodInfo } from './track.js';
 import { ui, render, stepsNote, daySheetHtml, noteStatus, sessionLabel, treatSheetHtml } from './views.js';
@@ -238,6 +238,17 @@ const ACTIONS = {
     const c = d.check;
     if (['sleep', 'sore', 'energy', 'pain'].every((x) => c[x] != null) && ui.checkEdit === ui.selDate && f === 'pain') ui.checkEdit = null;
     save(); render();
+  },
+  deload: (el) => {
+    const on = el.dataset.v === '1';
+    setDeload(todayKey(), on);
+    // Trim ticks on today if it has some, so they match the new number of sets.
+    const d = dayWrite(todayKey()), p = planFor(todayKey());
+    if (!p.rest) p.exercises.forEach((e) => {
+      const arr = d.sets[e.id];
+      if (arr && arr.length > e.sets) { d.sets[e.id] = arr.slice(0, e.sets); d.done[e.id] = d.sets[e.id].every(Boolean); }
+    });
+    save(); render(); toast(isDeload(todayKey()) ? 'Deload on: half the sets this week.' : 'Training normal this week.');
   },
   'check-edit': () => { ui.checkEdit = ui.selDate; render(); },
   lighter: (el) => {

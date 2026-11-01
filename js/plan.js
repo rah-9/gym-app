@@ -1,7 +1,7 @@
 /* Plan logic: which workout a day gets, what counts as done, streaks and last weights. */
 import { WORKOUTS, SCHEDULE, WARMUP, HABITS, MEALS, PROGRAM_START } from './data.js';
 import { S, dayHasProgress } from './store.js';
-import { addDays, todayKey, dow, fromKey, keyOf, MONTH_NAMES } from './util.js';
+import { addDays, todayKey, dow, fromKey, keyOf, MONTH_NAMES, weekStartOf } from './util.js';
 
 export const STEP_GOAL = 10000;
 export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday first
@@ -43,7 +43,29 @@ export function workoutKeyFor(k) {
    Deload: every 7th program week, half the sets (rounded up), same weights.
    Lighter day: chosen from the daily check-in, one set less on every exercise. */
 export const DELOAD_EVERY = 7;
-export function isDeload(k) { const w = programWeek(k); return w > 0 && w % DELOAD_EVERY === 0; }
+// Every 7th program week is suggested as a deload. You choose: yes or no, at the start of the week
+// (or any week from Plan). The choice applies from the day you made it, so logged days keep their sets.
+export function deloadSuggested(k) { const w = programWeek(k); return w > 0 && w % DELOAD_EVERY === 0; }
+export const deloadChoice = (k) => ((S.settings.deloads || {})[weekStartOf(k)]) || null;
+export function isDeload(k) {
+  const c = deloadChoice(k);
+  return !!c && c.on && k >= c.from && (!c.to || k <= c.to);
+}
+export function setDeload(k, on) {
+  const ws = weekStartOf(k), today = todayKey();
+  S.settings.deloads = Object.assign({}, S.settings.deloads);
+  const prev = S.settings.deloads[ws];
+  if (on) {
+    // Start from the first day of the week that has nothing logged yet, but not before today.
+    let from = today > ws ? today : ws;
+    while (from <= addDays(ws, 6) && dayHasProgress(S.days[from])) from = addDays(from, 1);
+    S.settings.deloads[ws] = { on: true, from };
+  } else if (prev && prev.on && prev.from < today) {
+    S.settings.deloads[ws] = { on: true, from: prev.from, to: addDays(today, -1) }; // keep the deloaded days already done
+  } else {
+    S.settings.deloads[ws] = { on: false, from: today };
+  }
+}
 export const isLighter = (k) => !!((S.days[k] || {}).lighter);
 export function dayMode(k) { return isDeload(k) ? 'deload' : isLighter(k) ? 'light' : ''; }
 const ADJ = {};
