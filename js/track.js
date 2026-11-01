@@ -142,6 +142,7 @@ export function dayActive(k) {
   if (p && !p.rest && d.done.cardio) cardio += minutesIn(p.cardio.detail);
   if (p && p.rest && d.done.walk) cardio += 30;
   makeupFor(k).forEach((it) => { if (it.kind === 'cardio' && makeupTicked(k, it.id)) cardio += 15; });
+  if (d.hc && d.hc.exMin > cardio) cardio = d.hc.exMin; // exercise your phone recorded, if more
   const typed = d.brisk !== undefined && d.brisk !== '' ? parseInt(d.brisk, 10) || 0 : null;
   const walk = typed != null ? typed : briskFromSteps(d.steps);
   return { cardio, walk, est: typed == null && walk > 0, total: cardio + walk };
@@ -219,4 +220,12 @@ export function calorieTarget(bodyStats) {
     else advice = 'Losing at a healthy pace. Keep it here.';
   }
   return { bmr, tdee, deficit: tdee - target, target, advice, weight: w };
+}
+
+/* ---------- phone use and sleep from the Android app ---------- */
+export function weekPhone(ws) {
+  const list = weekDays(ws).map((k) => dayRead(k).phone).filter((p) => p && p.screenMs != null);
+  if (!list.length) return { days: 0 };
+  const avg = (f, src) => { const v = (src || list).map((p) => p[f]).filter((x) => x > 0); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0; };
+  return { days: list.length, screen: avg('screenMs'), free: avg('freeMs'), unlocks: avg('unlocks'), sleep: avg('sleepMs') };
 }

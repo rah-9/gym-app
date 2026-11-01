@@ -50,3 +50,43 @@ export async function saveFile(name, blob) {
   const w = await call('Filesystem', 'writeFile', { path: name, data: b64, directory: 'CACHE', recursive: true });
   await call('Share', 'share', { title: name, files: [w.uri], dialogTitle: 'Save or send ' + name });
 }
+
+/* ---------- activity from Health Connect: exercise minutes and active calories today ---------- */
+export const HEALTH_PERMS = ['READ_STEPS', 'READ_WORKOUTS', 'READ_ACTIVE_CALORIES', 'READ_TOTAL_CALORIES', 'READ_DISTANCE'];
+export async function healthPerms() {
+  try { return (await call('HealthPlugin', 'checkHealthPermissions', { permissions: HEALTH_PERMS })).permissions || {}; } catch (e) { return {}; }
+}
+export async function askHealth() {
+  return (await call('HealthPlugin', 'requestHealthPermissions', { permissions: HEALTH_PERMS })).permissions || {};
+}
+export async function readActivity() {
+  const now = new Date(), start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const out = { exMin: 0, kcal: 0, sessions: [] };
+  try {
+    const w = await call('HealthPlugin', 'queryWorkouts', { startDate: start.toISOString(), endDate: now.toISOString(), includeHeartRate: false, includeRoute: false, includeSteps: false });
+    (w.workouts || []).forEach((x) => { const m = Math.round((x.duration || 0) / 60); out.exMin += m; out.sessions.push({ type: String(x.workoutType || 'Exercise').toLowerCase().replace(/_/g, ' '), min: m }); });
+  } catch (e) { /* no permission or no data */ }
+  try {
+    const c = await call('HealthPlugin', 'queryAggregated', { startDate: start.toISOString(), endDate: now.toISOString(), dataType: 'active-calories', bucket: 'day' });
+    out.kcal = Math.round((c.aggregatedData || []).reduce((a, s) => a + (s.value || 0), 0));
+  } catch (e) { /* ignore */ }
+  return out;
+}
+
+/* ---------- phone use (our own PhoneUsage plugin, Android Usage Access) ---------- */
+export async function usageAllowed() { try { return !!(await call('PhoneUsage', 'hasAccess')).granted; } catch (e) { return false; } }
+export const openUsageSettings = () => call('PhoneUsage', 'openAccessSettings');
+export async function usageSummary(dayStartMs) { return call('PhoneUsage', 'summary', { dayStart: dayStartMs }); }
+export const scheduleSummaries = (o) => call('PhoneUsage', 'scheduleSummaries', o).catch(() => {});
+
+/* ---------- scheduled reminders (Android delivers them even when the app is closed) ---------- */
+const LN = (m, o) => call('LocalNotifications', m, o);
+export async function replacePlanned(list) {
+  try {
+    const p = await LN('getPending');
+    const old = (p.notifications || []).filter((n) => n.id >= 20000 && n.id < 30000).map((n) => ({ id: n.id }));
+    if (old.length) await LN('cancel', { notifications: old });
+    if (list.length) await LN('schedule', { notifications: list.map((n) => ({ id: n.id, title: n.title, body: n.body, channelId: 'fit_main', schedule: { at: new Date(n.at).toISOString(), allowWhileIdle: true } })) });
+    return true;
+  } catch (e) { return false; }
+}

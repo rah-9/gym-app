@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Rahul's Gym Log</title>
+  <title>FitTrack</title>
   <meta name="description" content="Daily gym checklist, rest timer and weekly report.">
   <meta name="theme-color" content="#0a0a0c">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Gym Log">
+  <meta name="apple-mobile-web-app-title" content="FitTrack">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
@@ -16,7 +16,7 @@
 <body>
   <div id="lock" class="lock" hidden>
     <div class="lock-inner">
-      <div class="brand big">Gym <span>log</span></div>
+      <div class="brand big">Fit<span>Track</span></div>
       <p class="lock-sub">Enter your PIN</p>
       <div id="pindots" class="pindots" aria-live="polite"><i></i><i></i><i></i><i></i></div>
       <p id="pinmsg" class="pinmsg" role="alert"></p>
@@ -31,7 +31,7 @@
 
   <div id="root" hidden>
     <header class="top">
-      <div class="brand">Gym <span>log</span></div>
+      <div class="brand">Fit<span>Track</span></div>
       <button type="button" class="iconbtn" data-action="lock" aria-label="Lock">Lock</button>
     </header>
     <main id="view" class="view"></main>
@@ -39,6 +39,7 @@
       <button type="button" data-view="today">Today</button>
       <button type="button" data-view="report">Report</button>
       <button type="button" data-view="plan">Plan</button>
+      <button type="button" data-view="journal">Journal</button>
     </nav>
     <div id="restbar" class="restbar" hidden role="timer" aria-live="off">
       <div class="rb-text"><span id="restname">Rest</span><b id="resttime">0:00</b></div>

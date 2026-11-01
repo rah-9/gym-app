@@ -4,6 +4,10 @@ import { setDeload, isDeload, planFor, dayWrite, dayStats, nextUp, findEx, hasPr
 import { reportData, reportText, docReport, pdfReport } from './report.js';
 import { foodInfo } from './track.js';
 import * as native from './native.js';
+import * as phone from './phone.js';
+import * as journal from './journal.js';
+journal.J.onLock = () => { if (ui.view === 'journal') render(); };
+journal.J.onChange = () => { if (ui.view === 'journal') render(); };
 import { ui, render, stepsNote, daySheetHtml, noteStatus, sessionLabel, treatSheetHtml } from './views.js';
 import { startRest, addRest, setRestEnd, stopRest } from './timer.js';
 import { initLock, isUnlocked, showLock, lockNow, recordActivity } from './lock.js';
@@ -198,6 +202,7 @@ function toggleSet(id, i) {
 function notifyOn() {
   notify.enable().then((p) => {
     render();
+    if (p === 'granted') phone.planReminders();
     if (p === 'granted') { toast('Notifications on.'); pushProgress(); }
     else if (p === 'denied') toast('Blocked. Allow notifications in your phone settings.');
     else if (p === 'unsupported') toast('This browser cannot show notifications.');
@@ -251,9 +256,60 @@ const ACTIONS = {
     });
     save(); render(); toast(isDeload(todayKey()) ? 'Deload on: half the sets this week.' : 'Training normal this week.');
   },
-  'steps-connect': () => syncSteps(true).then(() => { if (ui.health && ui.health.allowed) toast('Phone steps connected.'); else if (ui.health && !ui.health.avail) toast('Install Health Connect first.'); else toast('Allow steps in Health Connect.'); }),
+  'steps-connect': () => syncSteps(true).then(() => { if (ui.health && ui.health.allowed) toast('Phone data connected.'); else if (ui.health && !ui.health.avail) toast('Install Health Connect first.'); else toast('Allow steps in Health Connect.'); }),
+  'usage-open': () => native.openUsageSettings().catch(() => toast('Open Settings > Apps > Special access > Usage access.')),
+  'save-sleep': () => {
+    const bed = ($('#sl-bed') || {}).value, wake = ($('#sl-wake') || {}).value;
+    if (!bed || !wake) { toast('Pick both times.'); return; }
+    S.settings.sleep = Object.assign({}, phone.sleepPlan(), { bed, wake });
+    save(); render(); phone.planReminders(); toast('Sleep schedule saved. Reminders updated.');
+  },
+  'sleep-toggle': () => { S.settings.sleep = Object.assign({}, phone.sleepPlan(), { on: !phone.sleepPlan().on }); save(); render(); phone.planReminders(); },
+  'remind-workout': () => { const r = S.settings.remind || {}; S.settings.remind = Object.assign({}, r, { workout: r.workout === false }); save(); render(); phone.planReminders(); },
   'steps-install': () => native.installHealthConnect(),
   'steps-settings': () => native.openHealthConnect(),
+  'j-setup': async () => {
+    const a = ($('#j-pw1') || {}).value || '', b = ($('#j-pw2') || {}).value || '';
+    if (a.length < 4) { toast('Use at least 4 characters.'); return; }
+    if (a !== b) { toast('The two passwords do not match.'); return; }
+    if (a === '9124') { toast('Pick a password different from the app PIN.'); return; }
+    toast('Creating...'); await journal.setUp(a); render(); toast('Journal ready. Only this password opens it.');
+  },
+  'j-unlock': async () => {
+    const pw = ($('#j-pw') || {}).value || '';
+    if (!pw) return;
+    toast('Opening...');
+    const ok = await journal.unlock(pw);
+    if (!ok) { toast('Wrong password.'); return; }
+    render();
+  },
+  'j-lock': () => { journal.lock(); render(); },
+  'j-mood': (el) => { journal.J.mood = journal.J.mood === +el.dataset.v ? 0 : +el.dataset.v; journal.touch(); render(); },
+  'j-rec': async () => {
+    const ok = await journal.startRecording((s) => { const t = $('#j-rec-t'); if (t) t.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); });
+    if (ok) render();
+  },
+  'j-rec-stop': () => journal.stopRecording(false),
+  'j-rec-cancel': () => { if (journal.J.recording) journal.stopRecording(true); journal.J.draftAudio = null; render(); },
+  'j-save': async () => {
+    const text = (($('#j-text') || {}).value || '').trim();
+    if (!text && !journal.J.draftAudio) { toast('Write something or record a voice note.'); return; }
+    await journal.addEntry(text); journal.J.draftText = ''; render(); toast('Saved and encrypted.');
+  },
+  'j-play': async (el) => {
+    const url = await journal.audioUrl(el.dataset.id);
+    const box = $('#ja-' + el.dataset.id);
+    if (url && box) { box.innerHTML = '<audio controls autoplay src="' + url + '"></audio>'; }
+  },
+  'j-del': async (el) => {
+    if (journal.J.delArm !== el.dataset.id) { journal.J.delArm = el.dataset.id; render(); setTimeout(() => { journal.J.delArm = null; }, 4000); return; }
+    journal.J.delArm = null; await journal.deleteEntry(el.dataset.id); render(); toast('Deleted.');
+  },
+  'j-export': () => journal.exportAll(),
+  'j-wipe': async () => {
+    if (!journal.J.wipeArm) { journal.J.wipeArm = true; render(); setTimeout(() => { journal.J.wipeArm = false; }, 4000); return; }
+    journal.J.wipeArm = false; await journal.wipe(); render(); toast('Journal erased.');
+  },
   'check-edit': () => { ui.checkEdit = ui.selDate; render(); },
   lighter: (el) => {
     const d = dayWrite(ui.selDate);
@@ -327,11 +383,11 @@ const ACTIONS = {
     const t = noteTarget(ui.selDate);
     toast(el.dataset.v === 'off' ? 'This note will not come back.' : t ? 'You will see this note on ' + DAY_NAMES[dow(t)] + ', ' + fmt(t) + '.' : 'Write a note first.');
   },
-  'remind-water': (el) => { S.settings.remind = Object.assign({}, S.settings.remind, { water: +el.dataset.v }); save(); render(); },
-  'remind-steps': () => { const r = S.settings.remind || {}; S.settings.remind = Object.assign({}, r, { steps: r.steps === false }); save(); render(); },
+  'remind-water': (el) => { S.settings.remind = Object.assign({}, S.settings.remind, { water: +el.dataset.v }); save(); render(); phone.planReminders(); },
+  'remind-steps': () => { const r = S.settings.remind || {}; S.settings.remind = Object.assign({}, r, { steps: r.steps === false }); save(); render(); phone.planReminders(); },
   'copy-report': () => {
     const txt = reportText(reportData(ui.reportWs));
-    const fallback = () => download('gym-report-' + ui.reportWs + '.txt', txt);
+    const fallback = () => download('fittrack-report-' + ui.reportWs + '.txt', txt);
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(() => toast('Report copied.'), fallback);
     else fallback();
   },
@@ -342,7 +398,7 @@ const ACTIONS = {
   'notify-on': notifyOn,
   'notify-later': () => { S.settings.notifyAsked = true; save(); render(); toast('You can turn them on later in the Plan tab.'); },
   'notify-off': () => { notify.disable(); render(); toast('Notifications off.'); },
-  'notify-test': () => notify.show('hello', 'Gym log', 'Notifications are working.', { silent: false, renotify: true }),
+  'notify-test': () => notify.show('hello', 'FitTrack', 'Notifications are working.', { silent: false, renotify: true }),
   'sched-reset': () => { resetSchedule(); save(); render(); toast('Default week restored.'); },
   'backup-now': () => { toast(backupNow('manual') ? 'Backup saved on this phone.' : 'Nothing to back up yet.'); render(); },
   'restore-autobackup': () => {
@@ -368,7 +424,7 @@ const ACTIONS = {
 document.addEventListener('click', (ev) => {
   const el = ev.target.closest('[data-action],[data-view]');
   if (!el) return;
-  if (el.dataset.view) { ui.view = el.dataset.view; render(); top(); return; }
+  if (el.dataset.view) { if (ui.view === 'journal' && el.dataset.view !== 'journal') journal.lock(); ui.view = el.dataset.view; render(); top(); return; }
   const fn = ACTIONS[el.dataset.action];
   if (fn) fn(el);
 });
@@ -390,6 +446,7 @@ document.addEventListener('input', (ev) => {
     d.brisk = t.value === '' ? undefined : Math.max(0, parseInt(t.value, 10) || 0);
     save();
   }
+  else if (t.id === 'j-text') { journal.J.draftText = t.value; journal.touch(); }
   else if (t.dataset.note) {
     const d = dayWrite(ui.selDate);
     d.note = t.value; d.noteAt = Date.now(); save();
@@ -428,6 +485,15 @@ document.addEventListener('change', (ev) => {
     save(); render(); toast('Week updated.');
     return;
   }
+  if (t.id === 'j-import' && t.files[0]) {
+    const fr = new FileReader();
+    fr.onload = async () => {
+      try { const n = await journal.importFile(fr.result); render(); toast(n + ' entries imported.'); }
+      catch (e) { toast(e.message === 'different password' ? 'That file was made with a different journal password.' : 'That is not a journal file.'); }
+    };
+    fr.readAsText(t.files[0]);
+    return;
+  }
   if (t.id === 'importfile' && t.files[0]) {
     const fr = new FileReader();
     fr.onload = () => {
@@ -448,37 +514,11 @@ function showApp() {
   syncSteps(false);
 }
 
-/* ---------- phone steps (Android app only) ----------
-   Reads today's and the last 7 days' steps from Health Connect whenever the app is opened or comes back. */
-let syncing = false;
-async function syncSteps(ask) {
-  if (!native.isNativeApp() || syncing) return;
-  syncing = true;
-  try {
-    const avail = await native.healthAvailable();
-    let allowed = avail && await native.stepsAllowed();
-    if (avail && !allowed && ask) allowed = await native.askSteps();
-    ui.health = { avail, allowed, at: ui.health && ui.health.at };
-    if (allowed) {
-      const map = await native.readSteps(7);
-      let changed = false;
-      Object.keys(map).forEach((k) => {
-        const v = map[k];
-        const cur = S.days[k];
-        if (!v && !cur) return;
-        const d = dayWrite(k);
-        const typed = d.stepsSrc !== 'phone' ? parseInt(d.steps, 10) || 0 : 0;
-        const val = Math.max(v, typed);
-        if (val && (parseInt(d.steps, 10) || 0) !== val) { d.steps = val; changed = true; }
-        if (val === v && v) d.stepsSrc = 'phone';
-        d.habits.steps = val >= STEP_GOAL;
-      });
-      ui.health.at = Date.now();
-      if (changed) save();
-    }
-  } catch (e) { ui.health = Object.assign({}, ui.health, { error: String(e && e.message || e) }); }
-  syncing = false;
-  if (!$('#root').hidden && !(document.activeElement && document.activeElement.tagName === 'INPUT')) render();
+/* ---------- phone data (Android app only): steps, activity, phone use, reminders ---------- */
+function syncSteps(ask) {
+  return phone.syncAll(ui, ask === true ? 'health' : ask, () => {
+    if (!$('#root').hidden && !(document.activeElement && document.activeElement.tagName === 'INPUT')) render();
+  });
 }
 setInterval(() => { if (document.visibilityState === 'visible') syncSteps(false); }, 5 * 60 * 1000);
 
@@ -514,6 +554,7 @@ function nudge(tag, title, body) {
   if (document.visibilityState === 'visible' && !$('#root').hidden) toast(body);
 }
 function remindTick() {
+  if (native.isNativeApp()) return; // the Android app schedules these with Android instead
   const r = S.settings.remind || {}, now = new Date(), h = now.getHours(), t = Date.now();
   if (h < 7 || h >= 22) return; // quiet from 10 PM to 7 AM, sleep time
   const d = S.days[todayKey()] || {};
@@ -534,7 +575,7 @@ function remindTick() {
 setInterval(remindTick, 60000);
 setTimeout(remindTick, 8000);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'visible') return;
+  if (document.visibilityState !== 'visible') { phone.planReminders(); if (journal.isOpen()) { journal.lock(); if (ui.view === 'journal') render(); } return; }
   if (!isUnlocked()) { showLock(); return; }
   checkNewDay();
   checkBackupSchedule();

@@ -1,4 +1,4 @@
-# Rahul's Gym Log
+# FitTrack (was Gym log)
 
 Daily gym checklist built from a weekly split, matched to the machines at the gym.
 Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
@@ -75,6 +75,20 @@ Reports and backups open the share sheet in the app.
 - GitHub Actions (`.github/workflows/android.yml`) builds `gymlog.apk` on every push to main and attaches it to the `android` release.
 - It is signed with the fixed key in `android-app/signing/` (personal sideload key), so new builds install over the old one.
 - Local build: `cd android-app && npm install && npm run www && npm run android:add && npm run sync`, then open `android/` in Android Studio.
+
+## Android-only extras
+
+- Health Connect: steps (today and last 7 days), exercise minutes and active calories today.
+- Phone and sleep (Usage access, our own `PhoneUsage` plugin in `android-app/native/`): screen time, phone-free time, unlocks,
+  longest break, top apps, and last night's sleep estimated from the longest screen-off stretch overnight (iSenseSleep idea).
+- Daily summaries posted by Android itself: sleep check 30 min after wake time, phone summary 1 hour before bed.
+- Reminders scheduled with Android (arrive when the app is closed): workout 7 AM and 6:30 PM, water, steps, wind down, bedtime, wake up, rest timer.
+
+## Private journal
+
+Journal tab with its own password (not the PIN). Text and voice notes, mood tag. AES-GCM 256 with a PBKDF2 key
+(600,000 rounds), stored in IndexedDB, locks after 5 minutes or when you leave the tab. No recovery if the password is lost.
+Export/import as an encrypted file.
 
 ## Where the data lives
 

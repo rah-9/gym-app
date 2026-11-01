@@ -86,7 +86,7 @@ h3 { font-weight: 600; font-size: 15px; margin: 18px 0 8px; color: var(--ink-2);
   padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(120px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
 }
 .tabs {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
   background: var(--bg); border-top: 1px solid var(--line);
   padding: 8px max(12px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
 }
@@ -1045,3 +1045,35 @@ button.cal-cell:active { transform: scale(0.94); }
 .phone-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 2px 0 0; }
 .phone-steps .chip { height: 30px; font-size: 13px; }
 .phone-steps .dot-ok { background: var(--accent); }
+.hc-row { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13.5px; color: var(--ink-2); margin-top: 2px; }
+.hc-row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.phonecard { display: grid; gap: 10px; }
+.pc-sleep { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); }
+.pc-sleep b { font-size: 20px; }
+.pc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pc-grid div { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+.pc-grid b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.pc-grid span { font-size: 12px; color: var(--muted); }
+.phonecard details.fold { margin: 0; }
+.pc-apps { padding: 0 14px 12px; }
+.sleepplan input[type="time"] { height: 34px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 0 12px; font: inherit; font-size: 14px; color-scheme: dark; }
+.sleepplan .num-row { align-items: flex-end; }
+.sleepplan .num-row .small-btn { margin-top: 0; }
+/* Journal */
+.jcard { display: grid; gap: 12px; }
+.jcard p { margin: 0; }
+.jfield { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+.jfield input { height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 0 14px; font: inherit; font-size: 16px; }
+.jfield input:focus { outline: none; border-color: var(--accent); }
+.jcard textarea { width: 100%; box-sizing: border-box; min-height: 120px; }
+.jmoods { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.jrec { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.jdraft { font-size: 13.5px; color: var(--accent); }
+.jentry { display: grid; gap: 8px; }
+.jentry p { margin: 0; white-space: normal; line-height: 1.5; color: var(--ink); }
+.jmeta { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--muted); }
+.jmood { padding: 2px 9px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); }
+.jmood.m1, .jmood.m2 { color: var(--miss); }
+.jmood.m4, .jmood.m5 { color: var(--accent); }
+.jaudio audio { width: 100%; height: 40px; }
+.jdel { justify-self: end; }

@@ -1,7 +1,7 @@
 /* Weekly report: numbers, plain text, Word (.doc) and PDF downloads. */
 import { S } from './store.js';
 import { planFor, dayRead, dayStats, dayStatus, counts, streak, bestStreak, monthStats, totalWorkoutDays, workedOut, EX_NAMES, STATUS_LABEL, STEP_GOAL, bodyStats, deadlineText, sessionMinutes, penaltyWeek, missedWeek } from './plan.js';
-import { weekVolume, weekCheck, strengthTrend, weekActive, weekProtein, calorieTarget } from './track.js';
+import { weekVolume, weekCheck, strengthTrend, weekActive, weekProtein, calorieTarget, weekPhone } from './track.js';
 import { esc, fmt, fromKey, addDays, todayKey, weekDays, dow, num, download, toast, DAY_NAMES, DAY_SHORT } from './util.js';
 
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
@@ -67,13 +67,13 @@ export function reportData(ws) {
     stepsTotal: stepsTotal, stepsDays: stepsDays, stepsGoal: stepsGoal,
     stepsAvg: stepsDays ? Math.round(stepsTotal / stepsDays) : 0,
     weights: weights, body: body, lastBody: lastBody, verdict: verdict, streak: streak(asOf),
-    volume: weekVolume(ws), check: weekCheck(ws), strength: strengthTrend(ws), active: weekActive(ws), protein: weekProtein(ws), calories: calorieTarget(bodyStats(asOf))
+    volume: weekVolume(ws), check: weekCheck(ws), strength: strengthTrend(ws), active: weekActive(ws), protein: weekProtein(ws), phoneW: weekPhone(ws), calories: calorieTarget(bodyStats(asOf))
   };
 }
 
 export function reportText(r) {
   let L = [];
-  L.push('GYM REPORT: ' + fmt(r.ws) + ' to ' + fmt(r.we));
+  L.push('FITTRACK WEEKLY REPORT: ' + fmt(r.ws) + ' to ' + fmt(r.we));
   L.push('');
   L.push('Workout score: ' + r.score + '% (' + r.done + ' of ' + r.total + ' items)');
   L.push('Workout days this week: ' + r.trained + ' of ' + r.trainDays + ' (' + r.fullDays + ' fully finished)');
@@ -107,6 +107,7 @@ export function reportText(r) {
   L.push(''); L.push('SETS PER MUSCLE (done / planned, target range)');
   r.volume.forEach(function (g) { L.push('- ' + g.name + ': ' + g.done + ' / ' + g.plan + ' (' + g.min + ' to ' + g.max + ')' + (g.status === 'low' ? ' LOW' : g.status === 'high' ? ' HIGH' : '')); });
   L.push(''); L.push('RECOVERY: ' + recoveryLine(r));
+  if (phoneLine(r)) L.push('PHONE AND SLEEP: ' + phoneLine(r));
   L.push('ACTIVITY: ' + r.active.total + ' of ' + r.active.goal + ' min (cardio ' + r.active.cardio + ', brisk walking ' + r.active.walk + (r.active.est ? ', part estimated' : '') + ')');
   L.push('PROTEIN: ' + proteinLine(r));
   if (r.calories) L.push('CALORIES: aim for about ' + num(r.calories.target) + ' kcal a day (maintenance ' + num(r.calories.tdee) + ')');
@@ -125,6 +126,11 @@ function recoveryLine(r) {
   const c = r.check;
   if (!c.days) return 'No check-ins this week.';
   return c.days + ' check-ins, sleep ' + c.sleep + ' h, soreness ' + c.sore + '/5, energy ' + c.energy + '/5, joint pain ' + c.painDays + ' days, lighter days ' + c.lighterDays + (c.deload ? ', deload week' : '');
+}
+function phoneLine(r) {
+  const p = r.phoneW, h = (ms) => { const m = Math.round((ms || 0) / 60000); return Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; };
+  if (!p || !p.days) return '';
+  return 'sleep ' + (p.sleep ? h(p.sleep) : '-') + ' a night (phone estimate), screen time ' + h(p.screen) + ' a day, phone-free ' + h(p.free) + ', ' + Math.round(p.unlocks) + ' unlocks a day';
 }
 function proteinLine(r) {
   const p = r.protein;
@@ -221,12 +227,12 @@ export function docReport(r) {
     '<div style="font-size:22pt;font-weight:bold;color:' + PC.ink + ';margin:2pt 0">' + esc(t[1]) + '</div><div style="font-size:8.5pt;color:' + PC.muted + '">' + esc(t[2]) + '</div>',
     'background:' + (bg || PC.tile) + ';padding:10pt;border:1px solid #ffffff;width:25%;vertical-align:top');
   const h2 = (t) => '<h2 style="font-size:13pt;color:' + PC.ink + ';margin:18pt 0 6pt;border-bottom:2px solid ' + PC.accent + ';padding-bottom:3pt">' + esc(t) + '</h2>';
-  let h = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>Gym report</title>' +
+  let h = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>FitTrack report</title>' +
     '<style>body{font-family:Calibri,Segoe UI,Arial,sans-serif;color:' + PC.ink + ';font-size:10.5pt}table{border-collapse:collapse;width:100%}' +
     'th{background:' + PC.tile + ';color:' + PC.muted + ';font-size:9pt;text-align:left;padding:5pt 7pt;border-bottom:1px solid ' + PC.line + '}' +
     '.t td{padding:5pt 7pt;border-bottom:1px solid ' + PC.line + ';font-size:10pt}</style></head><body>';
   // header band
-  h += '<table><tr>' + td('<div style="font-size:9pt;letter-spacing:2px;color:#b9a8ff">WEEKLY GYM REPORT</div>' +
+  h += '<table><tr>' + td('<div style="font-size:9pt;letter-spacing:2px;color:#b9a8ff">WEEKLY FITTRACK REPORT</div>' +
     '<div style="font-size:24pt;font-weight:bold;color:#ffffff;margin:3pt 0">' + fmt(r.ws) + ' to ' + fmt(r.we) + ' ' + yr + '</div>' +
     '<div style="font-size:11pt;color:' + PC.bandMuted + '">' + esc(r.verdict) + '</div>', 'background:' + PC.band + ';padding:16pt 18pt') + '</tr></table>';
   h += '<br><table><tr>' + kpis(r).map((t, i) => tile(t, i === 1 ? PC.goldSoft : PC.accentSoft)).join('') + '</tr></table>';
@@ -265,9 +271,9 @@ export function docReport(r) {
   h += h2('Sets per muscle') + '<table class="t"><tr><th>Muscle</th><th>Done</th><th>Planned</th><th>Target</th><th>Status</th></tr>' + r.volume.map((g) =>
     '<tr><td>' + esc(g.name) + '</td><td><b>' + g.done + '</b></td><td>' + g.plan + '</td><td>' + g.min + ' to ' + g.max + '</td><td style="font-weight:bold;color:' + (g.status === 'ok' ? PC.up : g.status === 'low' ? PC.down : PC.partialBorder) + '">' + (g.status === 'ok' ? 'In range' : g.status === 'low' ? 'Below' : 'Above') + '</td></tr>').join('') + '</table>';
   // recovery, activity, nutrition
-  h += h2('Recovery, activity and nutrition') + '<table class="t">' + [['Recovery', recoveryLine(r)],
+  h += h2('Recovery, activity and nutrition') + '<table class="t">' + [['Recovery', recoveryLine(r)]].concat(phoneLine(r) ? [['Phone and sleep', phoneLine(r)]] : []).concat([
     ['Activity minutes', r.active.total + ' of ' + r.active.goal + ' (cardio ' + r.active.cardio + ', brisk walking ' + r.active.walk + (r.active.est ? ', part estimated from steps' : '') + ')'],
-    ['Protein', proteinLine(r)], ['Calories', r.calories ? 'Aim for about ' + num(r.calories.target) + ' kcal a day (maintenance ' + num(r.calories.tdee) + ')' : 'Add height and age in the app']]
+    ['Protein', proteinLine(r)], ['Calories', r.calories ? 'Aim for about ' + num(r.calories.target) + ' kcal a day (maintenance ' + num(r.calories.tdee) + ')' : 'Add height and age in the app']])
     .map((x) => '<tr><td style="width:30%;color:' + PC.muted + '">' + x[0] + '</td><td>' + esc(x[1]) + '</td></tr>').join('') + '</table>';
   // missed workouts
   h += h2('Missed workouts') + (r.missedW.items.length
@@ -283,8 +289,8 @@ export function docReport(r) {
   h += h2('Missed') + (r.missed.length ? r.missed.map((m) => '<p style="margin:3pt 0"><span style="background:' + PC.missed + ';color:' + PC.down + ';font-weight:bold;padding:1pt 6pt">' + DAY_SHORT[dow(m.k)] + '</span> ' + esc(m.items.join(', ')) + '</p>').join('') : '<p style="color:' + PC.muted + '">Nothing missed. Clean week.</p>');
   const notes = notesOf(r);
   if (notes.length) h += h2('Notes') + notes.map((k) => '<p style="margin:4pt 0;padding:6pt 8pt;background:' + PC.tile + ';border-left:3px solid ' + PC.accent + '"><b>' + DAY_SHORT[dow(k)] + ' ' + fmt(k) + ':</b> ' + esc(dayRead(k).note) + '</p>').join('');
-  h += '<p style="color:' + PC.muted + ';font-size:8.5pt;margin-top:18pt">Made with Gym log on ' + fmt(todayKey()) + '.</p></body></html>';
-  download('gym-report-' + r.ws + '.doc', '﻿' + h, 'application/msword');
+  h += '<p style="color:' + PC.muted + ';font-size:8.5pt;margin-top:18pt">Made with FitTrack on ' + fmt(todayKey()) + '.</p></body></html>';
+  download('fittrack-report-' + r.ws + '.doc', '﻿' + h, 'application/msword');
 }
 
 let pdfLoading = null;
@@ -324,7 +330,7 @@ export function pdfReport(r) {
     doc.setFillColor(PC.band); doc.rect(0, 0, W, 128, 'F');
     doc.setFillColor('#2a2540'); doc.circle(W - 40, 10, 90, 'F');
     doc.setFillColor('#1c1a2b'); doc.circle(W - 120, 120, 60, 'F');
-    font(8.5, 'bold', '#b9a8ff'); doc.text('WEEKLY GYM REPORT', M, 40);
+    font(8.5, 'bold', '#b9a8ff'); doc.text('WEEKLY FITTRACK REPORT', M, 40);
     font(24, 'bold', PC.bandInk); doc.text(fmt(r.ws) + ' to ' + fmt(r.we) + ' ' + fromKey(r.ws).getFullYear(), M, 70);
     font(10.5, 'normal', PC.bandMuted);
     doc.splitTextToSize(r.verdict, CW - 40).slice(0, 2).forEach((l, i) => doc.text(l, M, 94 + i * 14));
@@ -450,8 +456,8 @@ export function pdfReport(r) {
 
     // Recovery, activity, nutrition
     heading('Recovery, activity and nutrition');
-    [['Recovery', recoveryLine(r)], ['Activity', r.active.total + ' of ' + r.active.goal + ' min (cardio ' + r.active.cardio + ', brisk walking ' + r.active.walk + (r.active.est ? ', part estimated' : '') + ')'],
-      ['Protein', proteinLine(r)], ['Calories', r.calories ? 'about ' + num(r.calories.target) + ' kcal a day (maintenance ' + num(r.calories.tdee) + ')' : 'add height and age in the app']].forEach((x) => {
+    [['Recovery', recoveryLine(r)]].concat(phoneLine(r) ? [['Phone', phoneLine(r)]] : []).concat([['Activity', r.active.total + ' of ' + r.active.goal + ' min (cardio ' + r.active.cardio + ', brisk walking ' + r.active.walk + (r.active.est ? ', part estimated' : '') + ')'],
+      ['Protein', proteinLine(r)], ['Calories', r.calories ? 'about ' + num(r.calories.target) + ' kcal a day (maintenance ' + num(r.calories.tdee) + ')' : 'add height and age in the app']]).forEach((x) => {
       const lines = doc.splitTextToSize(x[1], CW - 90);
       need(lines.length * 12 + 6);
       font(8.5, 'bold', PC.muted); doc.text(x[0].toUpperCase(), M, y + 10);
@@ -525,10 +531,10 @@ export function pdfReport(r) {
     const pages = doc.getNumberOfPages();
     for (let i = 1; i <= pages; i++) {
       doc.setPage(i); font(8, 'normal', PC.muted);
-      doc.text('Gym log  |  ' + fmt(r.ws) + ' to ' + fmt(r.we), M, H - 22);
+      doc.text('FitTrack  |  ' + fmt(r.ws) + ' to ' + fmt(r.we), M, H - 22);
       doc.text('Page ' + i + ' of ' + pages, W - M, H - 22, { align: 'right' });
     }
-    download('gym-report-' + r.ws + '.pdf', doc.output('blob'), 'application/pdf');
+    download('fittrack-report-' + r.ws + '.pdf', doc.output('blob'), 'application/pdf');
     toast('PDF downloaded.');
   }).catch(function () { toast('Could not load the PDF maker. Check internet, or use Word.'); });
 }

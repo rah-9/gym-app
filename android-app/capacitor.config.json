@@ -1,7 +1,10 @@
 {
   "appId": "com.rahul.gymlog",
-  "appName": "Gym log",
+  "appName": "FitTrack",
   "webDir": "www",
+  "plugins": {
+    "LocalNotifications": { "smallIcon": "ic_stat_fit", "iconColor": "#b9a8ff" }
+  },
   "android": {
     "backgroundColor": "#0a0a0c"
   }

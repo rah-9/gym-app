@@ -1,6 +1,6 @@
 {
-  "name": "Rahul's Gym Log",
-  "short_name": "Gym Log",
+  "name": "FitTrack",
+  "short_name": "FitTrack",
   "id": "/",
   "start_url": "/",
   "scope": "/",

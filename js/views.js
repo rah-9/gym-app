@@ -10,6 +10,8 @@ import { weekVolume, CHECK_FIELDS, checkOf, checkComplete, lighterReasons, weekC
 import { reportData, bestLabel } from './report.js';
 import * as notify from './notify.js';
 import { isNativeApp } from './native.js';
+import { journalHtml } from './journal.js';
+import { sleepPlan, clock12, sleepHoursPlanned, hrs, timeOf } from './phone.js';
 import { $, esc, fmt, keyOf, fromKey, addDays, todayKey, weekStartOf, weekDays, dow, num, restLabel, clockTime, DAY_NAMES, DAY_SHORT } from './util.js';
 
 export const ui = { view: 'today', selDate: todayKey(), reportWs: weekStartOf(todayKey()), open: {} };
@@ -51,7 +53,7 @@ function greeting() {
 export function render() {
   document.documentElement.style.setProperty('--day', dayColor(ui.selDate));
   const v = $('#view');
-  v.innerHTML = ui.view === 'report' ? renderReport() : ui.view === 'plan' ? renderPlan() : renderToday();
+  v.innerHTML = ui.view === 'report' ? renderReport() : ui.view === 'plan' ? renderPlan() : ui.view === 'journal' ? journalHtml() : renderToday();
   document.querySelectorAll('.tabs button').forEach((b) => {
     b.classList.toggle('on', b.dataset.view === ui.view);
     b.setAttribute('aria-current', b.dataset.view === ui.view ? 'page' : 'false');
@@ -277,8 +279,9 @@ function renderToday() {
   const steps = d.steps || '';
   body += '<h2>Daily habits</h2><div class="card stepscard"><div class="steps-top"><label class="name" for="steps-in">Steps today</label>' +
     '<label class="kg big"><input type="number" inputmode="numeric" min="0" max="100000" step="100" id="steps-in" data-steps="1" value="' + esc(steps) + '" placeholder="0"><span>steps</span></label></div>' +
-    phoneStepsRow(k) +
+    phoneStepsRow(k) + activityRow(k) +
     '<div class="bar"><span id="steps-bar" style="width:' + stepsPct(steps, stepGoalFor(k)) + '%"></span></div><div class="tip" id="steps-note">' + stepsNote(steps, stepGoalFor(k)) + '</div>' + briskRow(k) + '</div>';
+  body += phoneCard(k);
   const water = d.water || 0;
   body += '<div class="card watercard"><div class="steps-top"><span class="name">Water</span>' +
     '<span class="water-ctl"><button type="button" class="wbtn" data-action="water" data-n="-1" aria-label="One glass less">&#8722;</button>' +
@@ -364,7 +367,7 @@ function renderReport() {
     '<div class="stats">' + statRows + '</div>' +
     '<h2>Day by day</h2><div class="tablewrap"><table class="days"><thead><tr><th>Day</th><th>Workout</th><th class="num">Done</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<h2>Missed</h2>' + missed + todo +
-    '<h2>Weights</h2>' + weights + strengthSection(r) + volumeSection(r.volume, 'done', r.we >= todayKey()) + recoverySection(r) + activitySection(r) + proteinSection(r) +
+    '<h2>Weights</h2>' + weights + strengthSection(r) + volumeSection(r.volume, 'done', r.we >= todayKey()) + recoverySection(r) + phoneSection(r) + activitySection(r) + proteinSection(r) +
     bodySection() + missedSection(r.missedW) + junkSection(r.penalty) + badgeSection() +
     '<h2>Save this report</h2><div class="saverow">' +
     '<button type="button" class="primary" data-action="pdf-report">PDF</button>' +
@@ -622,7 +625,11 @@ function remindSection() {
     '<span class="segs">' + seg(0, 'Off') + seg(30, '30 min') + seg(60, '1 h') + seg(90, '1.5 h') + '</span></div>' +
     '<div class="rem-row"><div><b>Walk for steps</b><div class="muted small">Every 2 hours from 5 PM until ' + num(STEP_GOAL) + ' steps</div></div>' +
     '<button type="button" class="switch' + (steps ? ' on' : '') + '" data-action="remind-steps" role="switch" aria-checked="' + steps + '" aria-label="Steps reminder"></button></div>' +
-    '<p class="muted small">These come as phone notifications while the app is open or running in the background' + (notify.enabled() ? '' : '. Turn on notifications below to get them in your notification panel') + '. If the app is fully closed they cannot fire; that needs a push server.</p></div>';
+    (isNativeApp() ? '<div class="rem-row"><div><b>Workout</b><div class="muted small">7 AM and 6:30 PM on training days, skipped once you start</div></div>' +
+      '<button type="button" class="switch' + (r.workout !== false ? ' on' : '') + '" data-action="remind-workout" role="switch" aria-checked="' + (r.workout !== false) + '" aria-label="Workout reminder"></button></div>' : '') +
+    (isNativeApp()
+      ? '<p class="muted small">Android delivers these even when the app is closed. They are planned for the next 2 days each time you open or leave the app' + (notify.enabled() ? '.' : '. Turn on notifications below first.') + '</p></div>'
+      : '<p class="muted small">These come as phone notifications while the app is open or running in the background' + (notify.enabled() ? '' : '. Turn on notifications below to get them in your notification panel') + '. In the Android app they also arrive when it is closed.</p></div>') + sleepSection();
 }
 
 function notifySection() {
@@ -900,4 +907,55 @@ function phoneStepsRow(k) {
   const d = dayRead(k);
   return '<div class="phone-steps"><span class="dot-ok" aria-hidden="true"></span><span class="muted small">' + (d.stepsSrc === 'phone' ? 'From your phone' : 'Phone connected') + (h.at ? ', synced ' + clockTime(h.at) : '') + '</span>' +
     '<button type="button" class="linkbtn" data-action="steps-connect">Sync now</button></div>';
+}
+
+// Exercise minutes and active calories that Health Connect recorded today (Android app).
+function activityRow(k) {
+  if (!isNativeApp() || k !== todayKey()) return '';
+  const h = ui.health || {};
+  if (h.allowed && !h.activity) return '<div class="phone-steps"><span class="muted small">Also read exercise minutes and calories?</span><button type="button" class="linkbtn" data-action="steps-connect">Allow</button></div>';
+  const a = dayRead(k).hc;
+  if (!a) return '';
+  return '<div class="hc-row"><span><b>' + a.exMin + '</b> exercise min</span><span><b>' + num(a.kcal) + '</b> active kcal</span>' +
+    (a.sessions && a.sessions.length ? '<span class="muted small">' + esc(a.sessions.map((x) => x.type + ' ' + x.min + ' min').join(', ')) + '</span>' : '') + '</div>';
+}
+
+// Phone use and sleep (Android app, Usage Access).
+function phoneCard(k) {
+  if (!isNativeApp() || k !== todayKey()) return '';
+  const h = ui.health || {};
+  if (h.usage === undefined) return '';
+  if (!h.usage) return '<div class="card phonecard"><div class="steps-top"><span class="name">Phone and sleep</span></div>' +
+    '<p class="tip">See your screen time, hours away from the phone, unlocks, and last night\'s sleep worked out from when the screen stayed off. Android asks you to switch on Usage access for FitTrack once. Nothing leaves your phone.</p>' +
+    '<button type="button" class="chip" data-action="usage-open">Allow usage access</button></div>';
+  const p = dayRead(k).phone;
+  if (!p) return '';
+  const sp = sleepPlan();
+  const sleepLine = p.sleepMs
+    ? '<div class="pc-sleep"><span class="name">Last night</span><b>' + hrs(p.sleepMs) + '</b><span class="muted small">' + timeOf(p.sleepStart) + ' to ' + timeOf(p.sleepEnd) + (p.sleepMs < 7 * 36e5 ? ', under 7 h' : '') + '</span></div>'
+    : '<div class="pc-sleep"><span class="muted small">No clear sleep stretch found yet for last night.</span></div>';
+  const apps = (p.apps || []).slice(0, 5);
+  return '<div class="card phonecard"><div class="steps-top"><span class="name">Phone and sleep</span><span class="muted small">updated ' + timeOf(p.at) + '</span></div>' + sleepLine +
+    '<div class="pc-grid"><div><b>' + hrs(p.screenMs) + '</b><span>screen time</span></div><div><b>' + hrs(p.freeMs) + '</b><span>phone-free</span></div>' +
+    '<div><b>' + (p.unlocks || 0) + '</b><span>unlocks</span></div><div><b>' + hrs(p.longestFreeMs) + '</b><span>longest break</span></div></div>' +
+    (apps.length ? '<details class="fold"><summary>Top apps today</summary><ul class="food-log pc-apps">' + apps.map((a) => '<li><span>' + esc(a.name) + '</span><b>' + hrs(a.ms) + '</b></li>').join('') + '</ul></details>' : '') +
+    '<p class="muted small">Sleep is estimated from the longest screen-off stretch overnight (about 25 min off on average in research), so check it against how you feel.' + (sp.on ? ' Planned: ' + clock12(sp.bed) + ' to ' + clock12(sp.wake) + '.' : '') + '</p></div>';
+}
+
+function sleepSection() {
+  const sp = sleepPlan();
+  return '<h2>Sleep schedule <span class="h-note">same times every day</span></h2><div class="card panel sleepplan">' +
+    '<div class="rem-row"><div><b>Bedtime reminders</b><div class="muted small">Wind down 30 min before, bedtime, and wake up</div></div>' +
+    '<button type="button" class="switch' + (sp.on ? ' on' : '') + '" data-action="sleep-toggle" role="switch" aria-checked="' + sp.on + '" aria-label="Sleep reminders"></button></div>' +
+    '<div class="num-row"><label>Bed<input type="time" id="sl-bed" value="' + esc(sp.bed) + '"></label><label>Wake<input type="time" id="sl-wake" value="' + esc(sp.wake) + '"></label>' +
+    '<button type="button" class="primary small-btn" data-action="save-sleep">Save</button></div>' +
+    '<p class="muted small">' + sleepHoursPlanned() + ' hours in bed. Adults do best with 7+ hours at regular times: in a 7-year study, a steady routine with about 7 hours was linked to a 39% lower risk of death than erratic short sleep.' +
+    (isNativeApp() ? ' The morning and evening phone summaries follow these times.' : '') + '</p></div>';
+}
+
+export function phoneSection(r) {
+  const p = r.phoneW;
+  if (!p || !p.days) return '';
+  return '<h2>Phone and sleep</h2><div class="stats">' + [['Sleep (phone estimate)', p.sleep ? hrs(p.sleep) + ' a night' : '-'], ['Screen time', hrs(p.screen) + ' a day'], ['Phone-free', hrs(p.free) + ' a day'], ['Unlocks', Math.round(p.unlocks) + ' a day']]
+    .map((x) => '<div class="stat"><span>' + x[0] + '</span><b>' + x[1] + '</b></div>').join('') + '</div>';
 }
