@@ -183,7 +183,8 @@ const LEG_DAY = {
 /* ---------- Balanced week from 1 Nov 2026 (intermediate) ----------
    Every muscle is trained twice a week (research: 2x beats 1x for growth),
    about 10 to 20 hard sets per muscle per week, Sunday rest.
-   Main lifts: 4 sets, stop 1 to 2 reps before failure. Isolation: last set close to failure.
+   Effort in reps in reserve (RIR), per the 2026 ACSM position stand: heavy lifts stop 1 to 3 reps short of failure,
+   isolation moves 0 to 2 reps short. Every 7th program week is a deload (half the sets).
    Supersets (same tag, e.g. A1 + A2): do one set of each back to back, then rest. Saves time, keeps the heart rate up. */
 
 // Monday: chest (heavy) + triceps + side delts + abs
@@ -193,7 +194,7 @@ const PUSH_A = {
   short: 'Chest',
   cardio: { name: 'Incline treadmill walk', detail: '20 min, incline 8 to 12, speed 4.5 to 5.5 km/h' },
   exercises: [
-    ex('flat-press', 'Flat chest press, heavy', 'Plate loaded chest press (flat bench, red arms)', 4, '6-8', 150, 'Main lift. Add weight when you hit 8 on all sets. Shoulder blades back.', 'plate+loaded+iso+lateral+bench+press'),
+    ex('flat-press', 'Flat chest press, heavy', 'Plate loaded chest press (flat bench, red arms)', 4, '6-8', 150, 'Main lift, stop 1 to 3 reps short of failure. Add weight when you hit 8 on all sets. Shoulder blades back.', 'plate+loaded+iso+lateral+bench+press'),
     ex('incline-smith', 'Incline press', 'Smith machine + bench at 30 degrees', 3, '8-10', 120, 'Bar to upper chest, 30 degrees hits the upper chest best.', 'smith+machine+incline+bench+press+form'),
     ex('cable-fly', 'Cable crossover, high to low', 'Cable crossover, both pulleys high', 3, '12-15', 60, 'Big stretch, hands meet at belly button level.', 'cable+crossover+high+to+low+form'),
     ex('db-lateral', 'Dumbbell lateral raise', 'Dumbbells', 3, '12-15', 45, 'Pinkies slightly up, stop at shoulder height. Last set close to failure.', 'dumbbell+lateral+raise+form'),
@@ -212,7 +213,7 @@ const PULL_A = {
   short: 'Back',
   cardio: { name: 'Spin bike intervals', detail: '15 min: 8 rounds of 30 sec hard + 60 sec easy, then easy spin' },
   exercises: [
-    ex('front-lat', 'Front lat pulldown, heavy', 'Plate loaded front lat pulldown (knee pads)', 4, '8-10', 120, 'Main lift. Chest up, pull elbows down to your ribs.', 'plate+loaded+lat+pulldown+form'),
+    ex('front-lat', 'Front lat pulldown, heavy', 'Plate loaded front lat pulldown (knee pads)', 4, '8-10', 120, 'Main lift, stop 1 to 3 reps short of failure. Chest up, pull elbows down to your ribs.', 'plate+loaded+lat+pulldown+form'),
     ex('db-row', 'One arm dumbbell row', 'Flat bench + dumbbell', 3, '8-10 each arm', 90, 'Pull to the hip, big stretch at the bottom.', 'one+arm+dumbbell+row+form'),
     ex('close-pull', 'Close grip pulldown', 'Cable lat pulldown, MAG grip / V-handle', 3, '10-12', 90, 'Lean back a little, squeeze the lats.', 'mag+grip+close+grip+lat+pulldown'),
     ex('rear-delt', 'Rear delt fly, facing the pad', 'Pec Fly & Rear Delt machine', 3, '15', 45, 'Light, arms wide, pause at the back.', 'reverse+pec+deck+fly+form'),
@@ -230,7 +231,7 @@ const LEGS_A = {
   short: 'Legs',
   cardio: { name: 'Easy bike', detail: '10 min, light, to flush the legs' },
   exercises: [
-    ex('super-squat', 'Super squat, heavy', 'Super squat machine (red, shoulder pads)', 4, '8-10', 150, 'Main lift. Deep as you can with a flat back, knees over toes.', 'super+squat+machine+form'),
+    ex('super-squat', 'Super squat, heavy', 'Super squat machine (red, shoulder pads)', 4, '8-10', 150, 'Main lift, stop 1 to 3 reps short of failure. Deep as you can with a flat back, knees over toes.', 'super+squat+machine+form'),
     ex('leg-press', 'Leg press', '45 degree leg press, feet middle of the plate', 4, '10-12', 120, 'Go deep, never lock the knees.', '45+degree+leg+press+form'),
     ex('lunges', 'Walking lunges', 'Dumbbells (or bodyweight to start)', 3, '10 each leg', 90, 'Long steps, back knee close to the floor.', 'dumbbell+walking+lunges+form'),
     ex('leg-ext', 'Leg extension', 'Leg extension / leg curl machine', 3, '12-15', 60, 'Pause 1 second at the top, last set close to failure.', 'leg+extension+machine+form'),
@@ -248,15 +249,15 @@ const SHOULDER_BACK = {
   short: 'Delts+Back',
   cardio: { name: 'Incline treadmill walk', detail: '20 min, incline 8 to 12, speed 4.5 to 5.5 km/h' },
   exercises: [
-    ex('db-press', 'Seated dumbbell shoulder press, heavy', 'Bench upright + dumbbells', 4, '8-10', 120, 'Main lift. Ranked top for front delts in EMG tests. Do not lock elbows.', 'seated+dumbbell+shoulder+press+form'),
+    ex('db-press', 'Seated dumbbell shoulder press, heavy', 'Bench upright + dumbbells', 4, '8-10', 120, 'Main lift, stop 1 to 3 reps short of failure. Ranked top for front delts in EMG tests. Do not lock elbows.', 'seated+dumbbell+shoulder+press+form'),
     ex('seated-row', 'Seated row, chest on pad, heavy', 'Plate loaded seated row', 4, '8-10', 120, 'Squeeze shoulder blades together, 1 second hold.', 'plate+loaded+seated+row+machine+form'),
     ex('cable-lat', 'Single arm cable lateral raise', 'Cable low pulley, D-handle, cable crossing in front', 3, '12-15 each side', 45, 'Constant tension. Lead with the elbow, stop at shoulder height.', 'single+arm+cable+lateral+raise'),
     ex('wide-pull', 'Wide grip lat pulldown', 'Cable lat pulldown, long bar', 3, '10-12', 90, 'Hands just outside shoulders, pull to upper chest.', 'wide+grip+lat+pulldown+form'),
     ex('incline-row', 'Chest supported incline dumbbell row', 'Bench at 45 degrees + dumbbells, chest on the pad', 3, '10-12', 75, 'Elbows out wide. Hits rear delts, side delts and upper back together.', 'chest+supported+incline+dumbbell+row+form'),
     ex('rear-delt', 'Rear delt fly, facing the pad (B1)', 'Pec Fly & Rear Delt machine', 3, '15', 0, 'Superset B: go straight to face pulls.', 'reverse+pec+deck+fly+form'),
     ex('face-pull', 'Cable face pull (B2)', 'Cable pulley at face height, rope', 3, '15', 60, 'Pull to forehead, elbows high. Keeps shoulders healthy.', 'cable+face+pull+form'),
-    ex('shrug', 'Dumbbell shrug', 'Dumbbells', 2, '12-15', 60, 'Straight up, hold 1 second.', 'dumbbell+shrug+form', 1),
-    ex('db-lateral', 'Dumbbell lateral raise, drop set', 'Dumbbells', 1, '15 then lighter to failure', 0, 'One all-out set to finish the side delts.', 'dumbbell+lateral+raise+drop+set', 2)
+    ex('shrug', 'Dumbbell shrug', 'Dumbbells', 2, '12-15', 60, 'Straight up, hold 1 second at the top. Direct work for the traps.', 'dumbbell+shrug+form'),
+    ex('db-lateral', 'Dumbbell lateral raise, drop set', 'Dumbbells', 1, '15 then lighter to failure', 0, 'One all-out set to finish the side delts.', 'dumbbell+lateral+raise+drop+set', 1)
   ]
 };
 
@@ -267,15 +268,15 @@ const PUSH_B = {
   short: 'Chest+Arms',
   cardio: { name: 'Spin bike intervals', detail: '15 min: 8 rounds of 30 sec hard + 60 sec easy, then easy spin' },
   exercises: [
-    ex('incline-db', 'Incline dumbbell press', 'Bench at 30 degrees + dumbbells', 4, '8-10', 120, 'Main lift. Upper chest. Lower to chest level, press up and in.', 'incline+dumbbell+press+form'),
+    ex('incline-db', 'Incline dumbbell press', 'Bench at 30 degrees + dumbbells', 4, '8-10', 120, 'Main lift, stop 1 to 3 reps short of failure. Upper chest. Lower to chest level, press up and in.', 'incline+dumbbell+press+form'),
     ex('chest-press', 'Seated chest press', 'Chest press machine (pin stack)', 3, '10-12', 90, 'Smooth, full squeeze.', 'seated+chest+press+machine+form'),
     ex('pec-fly', 'Pec fly, facing out', 'Pec Fly & Rear Delt machine', 3, '12-15', 60, 'Slight bend in elbows, squeeze in the middle.', 'pec+deck+fly+machine+form'),
     ex('preacher-db', 'Single arm preacher curl (C1)', 'Curl machine arm pad + dumbbell', 3, '10-12 each arm', 0, 'Superset C: go straight to the rope pushdown.', 'single+arm+dumbbell+preacher+curl'),
     ex('rope-pushdown', 'Rope pushdown (C2)', 'Cable pulley, rope', 3, '12', 60, 'Split the rope at the bottom. Rest after this one.', 'rope+tricep+pushdown+form'),
     ex('hammer', 'Hammer curl (D1)', 'Dumbbells', 3, '10-12', 0, 'Superset D: go straight to the V-bar pushdown.', 'dumbbell+hammer+curl+form'),
     ex('vbar', 'V-bar pushdown (D2)', 'Cable pulley, V-bar', 3, '12', 60, 'Elbows pinned to your sides.', 'v+bar+tricep+pushdown+form'),
+    ex('cable-lat', 'Single arm cable lateral raise', 'Cable low pulley, D-handle', 3, '12-15 each side', 45, 'Second side-delt day of the week. Last set 0 to 2 reps short of failure.', 'single+arm+cable+lateral+raise'),
     ex('plank', 'Plank', 'Floor / mat', 3, '40 sec', 45, 'Straight line, squeeze glutes and abs.', 'plank+proper+form'),
-    ex('cable-lat', 'Single arm cable lateral raise', 'Cable low pulley, D-handle', 2, '15 each side', 45, 'Light pump for the side delts.', 'single+arm+cable+lateral+raise', 1),
     ex('curl-machine', 'Machine biceps curl, pump', 'Biceps curl machine (plate loaded, red arm)', 2, '15', 45, 'Light, slow reps.', 'plate+loaded+biceps+curl+machine+form', 2)
   ]
 };
@@ -421,10 +422,15 @@ export const HABITS = [
   { id: 'nojunk', name: 'No sugar, cold drinks or fried snacks' }
 ];
 
+// About 130 g protein without whey, about 145 g with one scoop. Budget veg, no daily paneer.
+// Navratri: no eggs; swap roti and chilla for kuttu or rajgira roti / sabudana khichdi with peanuts,
+// and lean on milk, dahi, paneer (a little), makhana and peanuts. Soya and dal are skipped in many homes then.
 export const MEALS = [
-  { id: 'breakfast', name: 'Breakfast', detail: '2 besan or moong chilla (or poha with peanuts), 1 glass milk, 1 banana. Eggs optional 2 to 3 days a week.' },
-  { id: 'lunch', name: 'Lunch', detail: '2 roti + small rice, big katori dal or rajma/chole, sabzi, dahi, salad' },
-  { id: 'snack', name: 'Evening snack', detail: 'Sprouts chaat or 40 g roasted chana + 1 seasonal fruit' },
-  { id: 'dinner', name: 'Dinner', detail: 'Soya chunks sabzi (50 g dry), 2 roti, sabzi, 1 tsp oil' },
-  { id: 'bed', name: 'Before bed', detail: 'Haldi milk or dahi + small handful of peanuts' }
+  { id: 'breakfast', name: 'Breakfast, about 27 g protein', detail: '3 moong dal chilla (90 g dal) + 1 katori dahi. Non-Navratri option: 3 egg omelette + 2 roti.' },
+  { id: 'milk', name: 'Mid-morning, about 8 g', detail: '1 glass milk (250 ml) + 1 fruit' },
+  { id: 'lunch', name: 'Lunch, about 34 g', detail: '3 roti, 1.5 katori dal or rajma/chole, sabzi with 25 g soya chunks, salad' },
+  { id: 'snack', name: 'Evening, about 8 g', detail: '40 g roasted chana or sprouts chaat + 1 seasonal fruit' },
+  { id: 'post', name: 'After the gym, about 8 to 24 g', detail: '1 glass milk, or 1 scoop whey in water if you use it' },
+  { id: 'dinner', name: 'Dinner, about 37 g', detail: 'Soya chunks sabzi (50 g dry) or 100 g tofu, 2 roti, sabzi, 1 katori dahi, 1 tsp oil' },
+  { id: 'bed', name: 'Before bed, about 8 g', detail: 'Haldi milk (1 glass), or skip if you are already at your protein target' }
 ];

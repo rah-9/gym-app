@@ -4,8 +4,9 @@ import { S } from './store.js';
 import {
   planFor, workoutKeyFor, schedule, dayRead, dayStats, dayStatus, hasProgress, mainExercises, bonusExercises,
   weightHint, musclesFor, nextUp, programWeek, counts, stepsPct, STEP_GOAL, STATUS_LABEL, WEEK_ORDER,
-  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, deadlineText, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek, stepGoalFor, treatDays, badges, kgHistory, makeupFor, makeupTicked, isMissedWorkout, missedWeek, MISSED_POINTS, MAKEUP_PER_DAY, makeupQueue
+  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, deadlineText, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek, stepGoalFor, treatDays, badges, kgHistory, makeupFor, makeupTicked, isMissedWorkout, missedWeek, MISSED_POINTS, MAKEUP_PER_DAY, makeupQueue, repTop, isDeload, dayMode, DELOAD_EVERY
 } from './plan.js';
+import { weekVolume, CHECK_FIELDS, checkOf, checkComplete, lighterReasons, weekCheck, strengthTrend, dayE1rm, dayActive, weekActive, FOODS, foodInfo, dayProtein, proteinTarget, weekProtein, calorieTarget, latestWeight, ACTIVITY, PROTEIN_PER_KG } from './track.js';
 import { reportData, bestLabel } from './report.js';
 import * as notify from './notify.js';
 import { $, esc, fmt, keyOf, fromKey, addDays, todayKey, weekStartOf, weekDays, dow, num, restLabel, clockTime, DAY_NAMES, DAY_SHORT } from './util.js';
@@ -109,12 +110,14 @@ function exerciseCard(e, d, isBonus, isNext) {
   if (isPR) lastNote = '<span class="hint pr"><b>New best ' + todayKg + ' kg</b><small>previous best ' + last.best + ' kg</small></span>';
   else if (last && !(todayKg > 0)) {
     lastNote = last.status === 'stay'
-      ? '<span class="hint stay"><b>Stay at ' + last.kg + ' kg</b><small>last time ' + last.setsDone + ' of ' + e.sets + ' sets, finish them all first</small></span>'
-      : '<span class="hint up"><b>&#8593; Go up to ' + last.next + ' kg</b><small>' + (last.status === 'push' ? 'same ' + last.kg + ' kg 3 times, time to push' : 'last time ' + last.kg + ' kg, all sets done') + '</small></span>';
+      ? '<span class="hint stay"><b>Stay at ' + last.kg + ' kg</b><small>' + (last.byReps ? 'last time ' + last.reps.join('/') + ' reps, get ' + last.top + ' on every set first' : 'last time ' + last.setsDone + ' of ' + last.planned + ' sets, finish them all first') + '</small></span>'
+      : '<span class="hint up"><b>&#8593; Go up to ' + last.next + ' kg</b><small>' + (last.status === 'push' ? 'same ' + last.kg + ' kg 3 times, time to push' : last.byReps ? 'last time ' + last.reps.join('/') + ' reps, top of the range on every set' : 'last time ' + last.kg + ' kg, all sets done') + '</small></span>';
   } else if (last) lastNote = '<span class="hint"><small>last time ' + last.kg + ' kg' + (last.best && last.best !== last.kg ? ', best ' + last.best : '') + '</small></span>';
   const watch = e.video ? '<a class="watch" href="' + esc(e.video) + '" target="_blank" rel="noopener" aria-label="Watch how to do ' + esc(e.name) + '">How to <span aria-hidden="true">&#8599;</span></a>' : '';
-  const tools = (!done || open) && (dots || kgField || watch)
-    ? '<div class="tools">' + (dots ? '<div class="dots">' + dots + '</div>' : '') + kgField + lastNote + watch + '</div>' : '';
+  const logs = hasKg && e.id !== 'warmup' ? setLogs(e, d, sets, last) : '';
+  const tools = ((!done || open) && (dots || kgField || watch)
+    ? '<div class="tools">' + (dots ? '<div class="dots">' + dots + '</div>' : '') + kgField + lastNote + watch + '</div>' : '') + logs;
+  const eff = hasKg && done ? effortRow(e, d) : '';
   const more = open
     ? '<div class="more">' + (e.tip ? '<p class="tip">' + esc(e.tip) + '</p>' : '') + works(e) + kgSpark(e.id) +
       (e.rest ? '<button type="button" class="chip" data-action="rest" data-sec="' + e.rest + '" data-name="' + esc(e.name) + '">Start rest timer, ' + restLabel(e.rest) + '</button>' : '') + '</div>'
@@ -126,7 +129,7 @@ function exerciseCard(e, d, isBonus, isNext) {
     '<span class="name">' + (isBonus ? '<span class="tag">Bonus</span>' : '') + esc(e.name) + '</span>' +
     '<span class="ex-sub"><b>' + dosage + '</b>' + (e.rest ? '<span>rest ' + restLabel(e.rest) + '</span>' : /\([A-D]1\)/.test(e.name) ? '<span>superset, no rest</span>' : '') + '</span>' +
     (done && !open ? '' : '<span class="machine">' + esc(e.machine) + '</span>') + '</span>' +
-    '<span class="chev" aria-hidden="true"></span></button></div>' + tools + more + '</li>';
+    '<span class="chev" aria-hidden="true"></span></button></div>' + tools + eff + more + '</li>';
 }
 
 function simpleCard(action, id, on, name, detail, info) {
@@ -199,7 +202,7 @@ function hero(k) {
     (k === today && !complete ? '<div class="greet">' + greeting() + '</div>' : '') +
     '<div class="hero-top"><div class="hero-text">' +
     '<div class="eyebrow">' + DAY_NAMES[dow(k)] + ', ' + fmt(k) + (k === today ? ' &middot; today' : '') + (wk ? ' &middot; week ' + wk : '') + '</div>' +
-    '<h1>' + esc(p.focus) + '</h1>' +
+    '<h1>' + esc(p.focus) + '</h1>' + modeTag(k, p) +
     '<div class="hero-sub">' + st.done + ' of ' + st.total + ' done' + (st.sets ? ' &middot; ' + st.sets + ' sets' : '') +
       (sessionLabel(k) ? ' &middot; <span id="sess">' + sessionLabel(k) + '</span>' : '') + '</div>' +
     (musclesFor(p).length ? '<div class="hero-works">Works ' + musclesFor(p).map(esc).join(', ') + '</div>' : '') +
@@ -273,7 +276,7 @@ function renderToday() {
   const steps = d.steps || '';
   body += '<h2>Daily habits</h2><div class="card stepscard"><div class="steps-top"><label class="name" for="steps-in">Steps today</label>' +
     '<label class="kg big"><input type="number" inputmode="numeric" min="0" max="100000" step="100" id="steps-in" data-steps="1" value="' + esc(steps) + '" placeholder="0"><span>steps</span></label></div>' +
-    '<div class="bar"><span id="steps-bar" style="width:' + stepsPct(steps, stepGoalFor(k)) + '%"></span></div><div class="tip" id="steps-note">' + stepsNote(steps, stepGoalFor(k)) + '</div></div>';
+    '<div class="bar"><span id="steps-bar" style="width:' + stepsPct(steps, stepGoalFor(k)) + '%"></span></div><div class="tip" id="steps-note">' + stepsNote(steps, stepGoalFor(k)) + '</div>' + briskRow(k) + '</div>';
   const water = d.water || 0;
   body += '<div class="card watercard"><div class="steps-top"><span class="name">Water</span>' +
     '<span class="water-ctl"><button type="button" class="wbtn" data-action="water" data-n="-1" aria-label="One glass less">&#8722;</button>' +
@@ -281,6 +284,7 @@ function renderToday() {
     '<button type="button" class="wbtn plus" data-action="water" data-n="1" aria-label="One more glass">+</button></span></div>' +
     '<div class="glasses">' + Array.from({ length: WATER_GOAL }, (_, i) => '<i class="' + (i < water ? 'on' : '') + '"></i>').join('') + '</div>' +
     '<div class="tip">' + (water >= WATER_GOAL ? 'Goal hit, 3 litres. Nice.' : (WATER_GOAL - water) + ' glasses of 250 ml to go.') + '</div></div>';
+  body += proteinCard(k);
   if (k === today) body += bodyCard();
   body += treatCard(k);
   body += '<div class="habits">' + HABITS.filter((h) => h.id !== 'steps' && h.id !== 'water').map((h) => {
@@ -301,7 +305,7 @@ function renderToday() {
     opt('next', nextK ? 'Next ' + esc(p.short) + ', ' + DAY_SHORT[dow(nextK)] : 'Next time') + opt('tomorrow', 'Tomorrow') + opt('off', 'Off') + '</span></div>';
   if (k !== today) body += '<button type="button" class="ghost wide" data-action="pick" data-k="' + today + '">Back to today</button>';
 
-  return weekStrip(k) + (k === today ? notifyPrompt() + reminderHtml() : '') + hero(k) + body;
+  return weekStrip(k) + (k === today ? notifyPrompt() + reminderHtml() : '') + hero(k) + (k <= today ? checkCard(k) : '') + body;
 }
 
 /* ---------- Report ---------- */
@@ -358,7 +362,7 @@ function renderReport() {
     '<div class="stats">' + statRows + '</div>' +
     '<h2>Day by day</h2><div class="tablewrap"><table class="days"><thead><tr><th>Day</th><th>Workout</th><th class="num">Done</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<h2>Missed</h2>' + missed + todo +
-    '<h2>Weights</h2>' + weights +
+    '<h2>Weights</h2>' + weights + strengthSection(r) + volumeSection(r.volume, 'done', r.we >= todayKey()) + recoverySection(r) + activitySection(r) + proteinSection(r) +
     bodySection() + missedSection(r.missedW) + junkSection(r.penalty) + badgeSection() +
     '<h2>Save this report</h2><div class="saverow">' +
     '<button type="button" class="primary" data-action="pdf-report">PDF</button>' +
@@ -398,7 +402,8 @@ export function daySheetHtml(k) {
   const missList = req.filter((it) => !d.done[it.id]).map((it) => it.name);
   const kgRows = Object.keys(d.kg || {}).filter((id) => parseFloat(d.kg[id]) > 0).map((id) => {
     const best = bestKg(id, k), v = parseFloat(d.kg[id]);
-    return '<li><span>' + esc(EX_NAMES[id] || id) + '</span><b>' + v + ' kg' + (best && v > best.kg ? ' <em>best</em>' : '') + '</b></li>';
+    const reps = ((d.reps || {})[id] || []).filter((x) => parseInt(x, 10) > 0);
+    return '<li><span>' + esc(EX_NAMES[id] || id) + '</span><b>' + v + ' kg' + (reps.length ? ' &times; ' + reps.join('/') : '') + (best && v > best.kg ? ' <em>best</em>' : '') + '</b></li>';
   }).join('');
   const mins = sessionMinutes(k);
   const chips = [
@@ -705,10 +710,163 @@ function renderPlan() {
     '<h2>Workouts</h2>' + workoutList() +
     '<h2>Watch list <span class="h-note">how to do each exercise</span></h2>' + watchList() +
     '<h2>Rules</h2><ul class="plain"><li>Every muscle is trained twice a week: chest Mon + Fri, back Tue + Thu, shoulders Mon + Thu, arms Mon, Tue + Fri, legs Wed + Sat, abs Mon, Wed + Fri.</li>' +
-    '<li>Main lifts (marked heavy): stop 1 to 2 reps before failure. Isolation moves: take the last set close to failure, form clean.</li>' +
+    '<li>Effort in reps in reserve (RIR): heavy lifts stop 1 to 3 reps short of failure, isolation moves 0 to 2 short. Going to failure every set is not needed (ACSM 2026).</li>' +
+    '<li>Log reps on each set. When every set reaches the top of the rep range, the app tells you to add the smallest weight jump.</li>' +
     '<li>Supersets (A1 + A2): one set of each back to back, then rest. Saves time and keeps the heart rate up for fat burn.</li>' +
     '<li>Hit the top reps on every set, then add the smallest weight jump next time.</li>' +
     '<li>Never lock knees on leg press. Keep your back flat on every row and pulldown.</li>' +
-    '<li>Every 6 to 8 weeks, one easy week at half the sets.</li></ul>' + goalLegend() +
+    '<li>Every ' + DELOAD_EVERY + 'th week is a deload: half the sets, same weights. The app does it for you.' + nextDeloadText() + '</li>' +
+    '<li>Bad sleep, very sore, low energy or joint pain? The daily check-in offers a lighter day: one set less on everything.</li></ul>' + goalLegend() +
+    volumeSection(weekVolume(weekStartOf(todayKey())), 'plan') + numbersSection() +
     remindSection() + notifySection() + dataSection();
+}
+
+/* ---------- performance tracking ---------- */
+
+// Reps (and kg if it changed) for every set you ticked.
+function setLogs(e, d, sets, last) {
+  const idx = [];
+  for (let i = 0; i < e.sets; i++) if (sets[i]) idx.push(i);
+  if (!idx.length) return '';
+  const reps = (d.reps || {})[e.id] || [], skg = (d.setKg || {})[e.id] || [];
+  const top = repTop(e.reps), base = d.kg[e.id] || (last ? last.kg : '');
+  return '<div class="setlogs">' + idx.map((i) =>
+    '<div class="setlog"><span class="sl-n">Set ' + (i + 1) + '</span>' +
+    '<label class="sl-f"><input type="number" inputmode="numeric" min="0" max="100" data-rep="' + esc(e.id) + '" data-i="' + i + '" value="' + esc(reps[i] || '') + '" placeholder="' + (top || '') + '" aria-label="Set ' + (i + 1) + ' reps"><span>reps</span></label>' +
+    '<label class="sl-f"><input type="number" inputmode="decimal" min="0" step="0.5" data-skg="' + esc(e.id) + '" data-i="' + i + '" value="' + esc(skg[i] || '') + '" placeholder="' + esc(base || 'kg') + '" aria-label="Set ' + (i + 1) + ' kg"><span>kg</span></label></div>').join('') +
+    '<p class="sl-hint">Reps you did. Leave kg empty if it was your working weight.</p></div>';
+}
+
+// How hard the last set felt, in reps left in the tank.
+const EFFORT = [['easy', '3+ left'], ['hard', '1 to 2 left'], ['max', '0 left']];
+function effortRow(e, d) {
+  const v = (d.effort || {})[e.id] || '';
+  const heavy = e.goal === 'strength';
+  let tip = '';
+  if (v === 'max' && heavy) tip = 'Heavy lifts: stop 1 to 3 reps short next time. Same gains, less wear.';
+  else if (v === 'easy') tip = heavy ? 'Room to push: add a rep or two next time.' : 'Isolation moves can go to 0 to 2 left. Add reps or weight.';
+  else if (v) tip = 'Right effort.';
+  return '<div class="effort"><span class="ef-l">Last set</span><span class="segs">' + EFFORT.map((x) =>
+    '<button type="button" class="seg' + (v === x[0] ? ' on' : '') + '" data-action="effort" data-id="' + esc(e.id) + '" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</span>' +
+    (tip ? '<span class="ef-tip">' + tip + '</span>' : '') + '</div>';
+}
+
+function modeTag(k, p) {
+  if (p.rest) return '';
+  if (isDeload(k)) return '<div class="mode-tag deload">Deload week &middot; half the sets, same weights</div>';
+  if (dayMode(k) === 'light') return '<div class="mode-tag light">Lighter day &middot; one set less on each exercise</div>';
+  return '';
+}
+
+function nextDeloadText() {
+  const wk = programWeek(todayKey());
+  if (!wk) return '';
+  const left = DELOAD_EVERY - (wk % DELOAD_EVERY);
+  if (left === DELOAD_EVERY) return ' This week is a deload week.';
+  return ' Next one in ' + left + (left === 1 ? ' week.' : ' weeks.');
+}
+
+// Daily check-in: sleep, soreness, energy, joint pain. Offers a lighter day when recovery is poor.
+function checkCard(k) {
+  const c = checkOf(k), d = dayRead(k), p = planFor(k);
+  const editing = ui.checkEdit === k || !checkComplete(c);
+  let html = '<div class="card checkin"><div class="ci-head"><span class="name">Daily check-in</span><span class="muted small">10 seconds</span></div>';
+  if (editing) {
+    html += Object.keys(CHECK_FIELDS).map((f) => {
+      const F = CHECK_FIELDS[f];
+      return '<div class="ci-row"><span class="ci-l">' + F.label + '</span><span class="ci-opts">' + F.opts.map((o) =>
+        '<button type="button" class="seg' + (c[f] === o[0] ? ' on' : '') + '" data-action="check" data-f="' + f + '" data-v="' + o[0] + '">' + o[1] + '</button>').join('') + '</span></div>';
+    }).join('');
+  } else {
+    const sl = CHECK_FIELDS.sleep.opts.find((o) => o[0] === c.sleep);
+    html += '<p class="ci-sum">Sleep ' + (sl ? sl[1] : '-') + ' &middot; Soreness ' + c.sore + '/5 &middot; Energy ' + c.energy + '/5 &middot; ' + (c.pain ? 'Joint pain' : 'No joint pain') +
+      ' <button type="button" class="linkbtn" data-action="check-edit">Edit</button></p>';
+  }
+  const why = lighterReasons(c);
+  if (!p.rest && !isDeload(k)) {
+    if (d.lighter) html += '<div class="ci-light on"><p><b>Lighter day on.</b> One set less on every exercise, same weights.</p><button type="button" class="ghost small-btn" data-action="lighter" data-v="0">Back to normal</button></div>';
+    else if (why.length) html += '<div class="ci-light"><p><b>Lighter day suggested</b> (' + esc(why.join(', ')) + '). Train, but one set less on every exercise. Better than skipping.</p><button type="button" class="primary small-btn" data-action="lighter" data-v="1">Use lighter day</button></div>';
+  }
+  if (c.pain === 1) html += '<p class="ci-warn">Skip any exercise that hurts the joint. If the pain lasts more than a few days, see a doctor or physio.</p>';
+  return html + '</div>';
+}
+
+function briskRow(k) {
+  const d = dayRead(k), a = dayActive(k), w = weekActive(weekStartOf(k));
+  return '<div class="brisk"><label class="kg small"><input type="number" inputmode="numeric" min="0" max="600" data-brisk="1" value="' + esc(d.brisk != null ? d.brisk : '') + '" placeholder="' + (a.est ? a.walk : 0) + '" aria-label="Brisk walk minutes"><span>min brisk walk</span></label>' +
+    '<span class="muted small">This week ' + w.total + ' of ' + w.goal + ' active min' + (w.est ? ' (walk estimated from steps)' : '') + '</span></div>';
+}
+
+// Protein: tap a food to add one serving.
+function proteinCard(k) {
+  const d = dayRead(k), f = d.food || {}, pr = dayProtein(k), target = proteinTarget(k);
+  const pct = Math.min(100, Math.round(pr.p / target * 100));
+  const cal = calorieTarget(bodyStats(k));
+  const logged = Object.keys(f).filter((id) => f[id] > 0 && foodInfo(id));
+  return '<div class="card protein"><div class="steps-top"><span class="name">Protein</span><b class="pr-n">' + pr.p + ' <small>/ ' + target + ' g</small></b></div>' +
+    '<div class="bar"><span style="width:' + pct + '%"></span></div>' +
+    '<div class="tip">' + (pr.p >= target ? 'Target hit. Muscle protected.' : (target - pr.p) + ' g to go. Target is ' + PROTEIN_PER_KG + ' g per kg of your weight.') +
+      (cal ? ' Calories: aim for about ' + num(cal.target) + ' kcal a day.' : ' Add height and age in Plan to get a calorie target.') + '</div>' +
+    (logged.length ? '<ul class="food-log">' + logged.map((id) => { const it = foodInfo(id); return '<li><span>' + esc(it.name) + (f[id] > 1 ? ' x' + f[id] : '') + '</span><b>' + it.p * f[id] + ' g</b>' +
+      '<button type="button" class="wbtn" data-action="food" data-id="' + id + '" data-n="-1" aria-label="Remove one ' + esc(it.name) + '">&#8722;</button></li>'; }).join('') + '</ul>' : '') +
+    '<details class="fold food-add"' + (ui.foodOpen ? ' open' : '') + '><summary data-action="food-toggle">Add food</summary><div class="food-chips">' + FOODS.map((it) =>
+      '<button type="button" class="fchip" data-action="food" data-id="' + it.id + '" data-n="1">' + esc(it.name) + '<b>' + it.p + ' g</b></button>').join('') +
+    '</div><p class="muted small">Typical values per serving. Check packet labels where you can. Navratri: skip eggs, soya and dal if your home does.</p></details></div>';
+}
+
+/* ---------- report and plan sections ---------- */
+export function volumeSection(v, mode, inProgress) {
+  const rows = v.map((g) => {
+    const n = mode === 'plan' ? g.plan : g.done, max = Math.max(24, g.max + 4);
+    const st = n > g.max ? 'high' : n < g.min ? (inProgress ? 'prog' : 'low') : 'ok';
+    return '<div class="vol"><span class="vol-n">' + esc(g.name) + '</span><span class="vol-bar"><i class="vol-range" style="left:' + (g.min / max * 100) + '%;width:' + ((g.max - g.min) / max * 100) + '%"></i>' +
+      '<i class="vol-fill ' + st + '" style="width:' + Math.min(100, n / max * 100) + '%"></i></span><b class="vol-v ' + st + '">' + n + (mode === 'done' ? '<small>/' + g.plan + '</small>' : '') + '</b></div>';
+  }).join('');
+  return '<h2>Sets per muscle <span class="h-note">' + (mode === 'plan' ? 'planned this week' : inProgress ? 'done so far / planned' : 'done / planned') + '</span></h2><div class="card volcard">' + rows +
+    '<p class="muted small">Shaded band = target range (about 10 to 20 for big muscles). Direct sets: the first muscle an exercise works counts a full set, a second main muscle half. Pressing also works front shoulders and triceps, pulling also works biceps.</p></div>';
+}
+
+function strengthSection(r) {
+  if (!r.strength.length) return '<h2>Strength trend</h2><p class="muted">Log reps on your heavy lifts to see your estimated max here.</p>';
+  return '<h2>Strength trend <span class="h-note">estimated max, last 8 weeks</span></h2><div class="tablewrap"><table><thead><tr><th>Lift</th><th class="num">Then</th><th class="num">Now</th><th class="num">Change</th></tr></thead><tbody>' +
+    r.strength.map((x) => '<tr><td>' + esc(x.name) + '</td><td class="num">' + x.first + '</td><td class="num">' + x.now + '</td><td class="num ' + (x.change > 0 ? 'up' : x.change < 0 ? 'down' : '') + '">' + x.chTxt + '</td></tr>').join('') +
+    '</tbody></table></div><p class="muted small">Estimated one-rep max from kg and reps (Epley). For tracking only, never test it.</p>';
+}
+
+function recoverySection(r) {
+  const c = r.check;
+  if (!c.days) return '<h2>Recovery</h2><p class="muted">Fill the daily check-in on Today to see sleep, soreness and energy here.</p>';
+  return '<h2>Recovery <span class="h-note">' + c.days + ' check-ins</span></h2><div class="stats">' +
+    [['Sleep', c.sleep != null ? c.sleep + ' h a night' : '-'], ['Soreness', c.sore + ' / 5'], ['Energy', c.energy + ' / 5'], ['Joint pain', c.painDays ? c.painDays + ' days' : 'None'],
+      ['Lighter days', String(c.lighterDays)]].concat(c.deload ? [['Deload', 'This week']] : [])
+      .map((x) => '<div class="stat"><span>' + x[0] + '</span><b>' + esc(x[1]) + '</b></div>').join('') + '</div>' +
+    (c.sleep != null && c.sleep < 7 ? '<p class="muted small">Under 7 hours slows recovery and fat loss. Sleep is part of the plan.</p>' : '');
+}
+
+function activitySection(r) {
+  const a = r.active, pct = Math.min(100, Math.round(a.total / a.goal * 100));
+  return '<h2>Activity minutes</h2><div class="card"><div class="steps-top"><span class="name">' + a.total + ' of ' + a.goal + ' min</span><span class="muted small">WHO: 150 to 300 a week</span></div>' +
+    '<div class="bar"><span style="width:' + pct + '%"></span></div><div class="tip">Cardio ' + a.cardio + ' min + brisk walking ' + a.walk + ' min' + (a.est ? ' (part estimated from steps)' : '') + '.</div></div>';
+}
+
+function proteinSection(r) {
+  const p = r.protein;
+  if (!p.days) return '<h2>Protein</h2><p class="muted">Add foods in the Protein card on Today to track it.</p>';
+  return '<h2>Protein</h2><div class="stats"><div class="stat"><span>Average</span><b>' + p.avg + ' g a day</b></div><div class="stat"><span>Target</span><b>' + p.target + ' g</b></div>' +
+    '<div class="stat"><span>Target hit</span><b>' + p.hit + ' of ' + p.days + ' days logged</b></div></div>';
+}
+
+function numbersSection() {
+  const me = S.settings.me || {}, cal = calorieTarget(bodyStats());
+  const w = latestWeight();
+  return '<h2>Your numbers <span class="h-note">for calories and protein, stays on this phone</span></h2><div class="card numbers">' +
+    '<div class="num-row"><label>Height<span class="kg"><input type="number" inputmode="numeric" id="me-h" min="120" max="230" value="' + esc(me.height || '') + '" placeholder="cm"><span>cm</span></span></label>' +
+    '<label>Age<span class="kg"><input type="number" inputmode="numeric" id="me-a" min="14" max="90" value="' + esc(me.age || '') + '" placeholder="yrs"><span>yrs</span></span></label>' +
+    '<label>Sex<select id="me-s"><option value="m"' + (me.sex !== 'f' ? ' selected' : '') + '>Male</option><option value="f"' + (me.sex === 'f' ? ' selected' : '') + '>Female</option></select></label></div>' +
+    '<button type="button" class="primary small-btn" data-action="save-me">Save</button>' +
+    (cal ? '<div class="stats cal-stats">' + [['Weight used', cal.weight + ' kg'], ['Burn at rest (BMR)', num(cal.bmr) + ' kcal'], ['Maintenance', num(cal.tdee) + ' kcal'], ['Eat about', num(cal.target) + ' kcal a day'], ['Deficit', num(cal.deficit) + ' kcal a day'], ['Protein', proteinTarget() + ' g a day']]
+        .map((x) => '<div class="stat"><span>' + x[0] + '</span><b>' + x[1] + '</b></div>').join('') + '</div>' +
+        (cal.advice ? '<p class="cal-advice">' + esc(cal.advice) + '</p>' : '') +
+        '<p class="muted small">Mifflin-St Jeor x ' + ACTIVITY + ' (moderate activity). About 500 kcal under maintenance, more only if your goal date needs it, never more than 25% or below BMR. It is an estimate: your weekly weigh-ins decide the real number.</p>'
+      : '<p class="muted small">' + (w ? 'Add height and age to get your calorie target.' : 'Log your weight on Today, then add height and age.') + '</p>') + '</div>';
 }

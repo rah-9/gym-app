@@ -2,6 +2,7 @@
 import { S, save, backupNow, checkBackupSchedule, autoRestore, restoreLatest, importBackup, exportBackup, wipeAll, requestPersistentStorage } from './store.js';
 import { planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct, streak, monthStats, bestKg, sessionMinutes, EX_NAMES, WATER_GOAL, noteTarget, treatInfo, treatPoints, ptsLabel, balanceFor, stepGoalFor, treatDays } from './plan.js';
 import { reportData, reportText, docReport, pdfReport } from './report.js';
+import { foodInfo } from './track.js';
 import { ui, render, stepsNote, daySheetHtml, noteStatus, sessionLabel, treatSheetHtml } from './views.js';
 import { startRest, addRest, setRestEnd, stopRest } from './timer.js';
 import { initLock, isUnlocked, showLock, lockNow, recordActivity } from './lock.js';
@@ -223,6 +224,51 @@ const ACTIONS = {
     d.balanceDone[el.dataset.id] = !d.balanceDone[el.dataset.id];
     save(); render(); if (d.balanceDone[el.dataset.id]) toast('Done. Points coming back.');
   },
+  effort: (el) => {
+    const d = dayWrite(ui.selDate);
+    d.effort = Object.assign({}, d.effort);
+    d.effort[el.dataset.id] = d.effort[el.dataset.id] === el.dataset.v ? '' : el.dataset.v;
+    save(); render();
+  },
+  check: (el) => {
+    const d = dayWrite(ui.selDate), f = el.dataset.f, v = +el.dataset.v;
+    d.check = Object.assign({}, d.check);
+    d.check[f] = v;
+    if (f === 'sleep') d.habits.sleep = v >= 7;
+    const c = d.check;
+    if (['sleep', 'sore', 'energy', 'pain'].every((x) => c[x] != null) && ui.checkEdit === ui.selDate && f === 'pain') ui.checkEdit = null;
+    save(); render();
+  },
+  'check-edit': () => { ui.checkEdit = ui.selDate; render(); },
+  lighter: (el) => {
+    const d = dayWrite(ui.selDate);
+    d.lighter = el.dataset.v === '1';
+    // Keep ticks consistent with the new number of sets.
+    const p = planFor(ui.selDate);
+    if (!p.rest) p.exercises.forEach((e) => {
+      ['sets', 'reps', 'setKg'].forEach((f) => { if (d[f] && Array.isArray(d[f][e.id])) d[f][e.id] = d[f][e.id].slice(0, e.sets); });
+      const arr = d.sets[e.id];
+      if (arr && arr.length) d.done[e.id] = arr.length >= e.sets && arr.slice(0, e.sets).every(Boolean);
+    });
+    save(); render(); toast(d.lighter ? 'Lighter day: one set less on each exercise.' : 'Back to the full workout.');
+  },
+  food: (el) => {
+    const d = dayWrite(ui.selDate), id = el.dataset.id;
+    d.food = Object.assign({}, d.food);
+    d.food[id] = Math.max(0, (d.food[id] || 0) + (+el.dataset.n));
+    if (!d.food[id]) delete d.food[id];
+    save(); render();
+    const it = foodInfo(id);
+    if (+el.dataset.n > 0 && it) toast('+' + it.p + ' g protein');
+  },
+  'food-toggle': (el) => { ui.foodOpen = !el.closest('details').open; },
+  'save-me': () => {
+    const h = parseFloat(($('#me-h') || {}).value), a = parseInt(($('#me-a') || {}).value, 10), sx = ($('#me-s') || {}).value || 'm';
+    if (!(h >= 120 && h <= 230)) { toast('Enter height in cm, like 175.'); return; }
+    if (!(a >= 14 && a <= 90)) { toast('Enter your age in years.'); return; }
+    S.settings.me = { height: Math.round(h), age: a, sex: sx };
+    save(); render(); toast('Saved. Calorie target updated.');
+  },
   expand: (el) => { const id = el.dataset.id; ui.open[id] = el.getAttribute('aria-expanded') !== 'true'; render(); },
   set: (el) => toggleSet(el.dataset.id, +el.dataset.i),
   habit: (el) => { const d = dayWrite(ui.selDate); d.habits[el.dataset.id] = !d.habits[el.dataset.id]; save(); render(); },
@@ -315,6 +361,20 @@ document.addEventListener('click', (ev) => {
 document.addEventListener('input', (ev) => {
   const t = ev.target;
   if (t.dataset.kg) { dayWrite(ui.selDate).kg[t.dataset.kg] = t.value; save(); }
+  else if (t.dataset.rep || t.dataset.skg) {
+    const d = dayWrite(ui.selDate), f = t.dataset.rep ? 'reps' : 'setKg', id = t.dataset.rep || t.dataset.skg, i = +t.dataset.i;
+    d[f] = Object.assign({}, d[f]);
+    const arr = (d[f][id] || []).slice();
+    while (arr.length <= i) arr.push('');
+    arr[i] = t.value;
+    d[f][id] = arr;
+    save();
+  }
+  else if (t.dataset.brisk) {
+    const d = dayWrite(ui.selDate);
+    d.brisk = t.value === '' ? undefined : Math.max(0, parseInt(t.value, 10) || 0);
+    save();
+  }
   else if (t.dataset.note) {
     const d = dayWrite(ui.selDate);
     d.note = t.value; d.noteAt = Date.now(); save();
@@ -333,7 +393,8 @@ document.addEventListener('input', (ev) => {
 
 document.addEventListener('change', (ev) => {
   const t = ev.target;
-  if (t.dataset.steps) { render(); return; }
+  if (t.dataset.steps || t.dataset.brisk) { render(); return; }
+  if (t.dataset.rep || t.dataset.skg) return; // keep the keyboard open between set boxes
   if (t.dataset.kg) {
     // New personal best alert when you type a heavier weight than ever before.
     const v = parseFloat(t.value), best = bestKg(t.dataset.kg, ui.selDate);

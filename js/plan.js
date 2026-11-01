@@ -39,7 +39,31 @@ export function workoutKeyFor(k) {
   if (d && d.plan && WORKOUTS[d.plan]) return d.plan;
   return schedule()[dow(k)];
 }
-export const planFor = (k) => WORKOUTS[workoutKeyFor(k)];
+/* Deload and lighter days change the number of sets, not the exercises.
+   Deload: every 7th program week, half the sets (rounded up), same weights.
+   Lighter day: chosen from the daily check-in, one set less on every exercise. */
+export const DELOAD_EVERY = 7;
+export function isDeload(k) { const w = programWeek(k); return w > 0 && w % DELOAD_EVERY === 0; }
+export const isLighter = (k) => !!((S.days[k] || {}).lighter);
+export function dayMode(k) { return isDeload(k) ? 'deload' : isLighter(k) ? 'light' : ''; }
+const ADJ = {};
+export function planFor(k) {
+  const key = workoutKeyFor(k), base = WORKOUTS[key];
+  if (!base || base.rest) return base;
+  const mode = dayMode(k);
+  if (!mode) return base;
+  const ck = key + '|' + mode;
+  if (!ADJ[ck]) {
+    ADJ[ck] = Object.assign({}, base, {
+      mode,
+      exercises: base.exercises.map((e) => Object.assign({}, e, {
+        baseSets: e.sets,
+        sets: mode === 'deload' ? Math.max(1, Math.ceil(e.sets / 2)) : Math.max(1, e.sets - 1)
+      }))
+    });
+  }
+  return ADJ[ck];
+}
 
 /* ---------- day records ---------- */
 const EMPTY = Object.freeze({ done: {}, sets: {}, kg: {}, habits: {}, meals: {}, note: '' });
@@ -109,12 +133,33 @@ export function bestKg(id, beforeK) {
 //  up   = every set was done last time, so add the smallest jump
 //  stay = sets were left last time, so keep the weight and finish them first
 //  same = the same weight was used 3 sessions in a row with all sets done, push harder
+// Top of the rep range: '8-10' -> 10, '12 each arm' -> 12, '15/12/10/10' -> 15.
+export function repTop(reps) {
+  const r = String(reps || '');
+  const m = r.match(/(\d+)\s*-\s*(\d+)/);
+  if (m) return +m[2];
+  const n = r.match(/\d+/);
+  return n ? +n[0] : null;
+}
+
+/* Progressive overload advice from the last session of this exercise (double progression):
+   with reps logged: every set reached the top of the rep range -> go up; otherwise stay and add reps.
+   without reps: every set ticked -> go up; sets left -> stay.
+   push = same weight 3 sessions in a row with every set done. */
 export function weightHint(k, e) {
   const last = lastKg(k, e.id);
   if (!last) return null;
   const ld = S.days[last.k] || {};
-  const setsDone = ((ld.sets || {})[e.id] || []).slice(0, e.sets).filter(Boolean).length;
-  const allSets = !!((ld.done || {})[e.id]) || (e.sets > 0 && setsDone >= e.sets);
+  const lastEx = findEx(last.k, e.id);
+  const planned = lastEx ? lastEx.sets : e.sets;
+  const setsDone = ((ld.sets || {})[e.id] || []).slice(0, planned).filter(Boolean).length;
+  const allSets = !!((ld.done || {})[e.id]) || (planned > 0 && setsDone >= planned);
+  const reps = ((ld.reps || {})[e.id] || []).slice(0, planned).map((v) => parseInt(v, 10) || 0);
+  const logged = reps.filter((v) => v > 0);
+  const top = repTop(e.reps);
+  const byReps = !!top && logged.length > 0;
+  const allTop = byReps && logged.length >= planned && logged.every((v) => v >= top);
+  const effort = (ld.effort || {})[e.id] || '';
   const step = last.kg < 10 ? 1 : 2.5;
   const next = Math.round((last.kg + step) * 10) / 10;
   let streakSame = 0;
@@ -125,9 +170,10 @@ export function weightHint(k, e) {
     if (v === last.kg) streakSame++; else break;
   }
   const best = bestKg(e.id, k);
+  const ready = byReps ? allTop : allSets;
   return {
-    kg: last.kg, k: last.k, allSets, setsDone, next, best: best ? best.kg : null,
-    status: allSets ? (streakSame >= 3 ? 'push' : 'up') : 'stay'
+    kg: last.kg, k: last.k, allSets, setsDone, next, best: best ? best.kg : null, top, byReps, reps: logged, effort, planned,
+    status: ready ? (streakSame >= 3 && !byReps ? 'push' : 'up') : 'stay'
   };
 }
 

@@ -15,7 +15,8 @@ Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
   - Friday: upper chest + arms in supersets + plank
   - Saturday: legs, glutes + hamstrings (Smith hip thrust and 45 degree back extension instead of the Romanian deadlift)
   - Sunday: rest day (walk, weigh in, stretch)
-  - Main lifts are 4 sets, stopping 1 to 2 reps before failure. Supersets are marked A1 + A2.
+  - Effort in reps in reserve (RIR): heavy lifts stop 1 to 3 reps short of failure, isolation moves 0 to 2 short. Supersets are marked A1 + A2.
+  - Every 7th program week is a deload: half the sets, same weights. The app applies it by itself.
   - Older workouts stay in the app for history and are hidden from the pickers.
   - Change any day in Plan > Your week. Before you tick anything, you can also switch a single day's workout from the Today card.
     Days you already logged keep the workout they were logged under, so changing the week never rewrites history.
@@ -51,6 +52,19 @@ Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
   - Rest timer with +15 s and Skip buttons, and "Rest over" with vibration even when the screen is off.
   - Works on Android Chrome. On iPhone it needs iOS 16.4+ and the app opened from the Home Screen.
   - There is no server, so the app cannot send reminders while it is fully closed.
+
+## Tracking performance, recovery and food
+
+- Reps and kg per set: tick a set, then type the reps (and kg if it differs from your working weight).
+  Weight advice uses double progression: when every set reaches the top of the rep range, add the smallest jump.
+- Last-set effort on finished lifts: 3+ left, 1 to 2 left, 0 left, with a tip if it is off target.
+- Daily check-in: sleep, soreness, energy, joint pain. Poor recovery offers a lighter day (one set less on every exercise).
+- Report: sets per muscle (done vs planned vs a 10 to 20 target band), strength trend (estimated max from kg and reps),
+  recovery averages, weekly activity minutes against WHO's 150, protein average. All of it is in the PDF, Word and text reports too.
+- Protein card: tap typical Indian veg foods to add protein. Target is 1.3 g per kg of your latest weight.
+- Plan > Your numbers: height, age and sex give a calorie target (Mifflin-St Jeor x 1.55, about a 500 kcal deficit,
+  never more than 25% or below BMR), adjusted by your weigh-in trend.
+- `js/track.js` holds this logic.
 
 ## Where the data lives
 

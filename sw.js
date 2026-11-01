@@ -1,11 +1,11 @@
 /* Service worker: makes the installed app work offline, shows notifications,
    and runs the rest countdown so "Rest over" arrives even with the screen off. */
-const CACHE = 'gymlog-v17';
+const CACHE = 'gymlog-v18';
 const SHELL = [
   '/', '/styles.css', '/manifest.webmanifest', '/icon.svg',
   '/icons/icon-192.png', '/icons/icon-512.png', '/icons/badge-96.png',
   '/js/main.js', '/js/data.js', '/js/util.js', '/js/store.js', '/js/plan.js',
-  '/js/report.js', '/js/notify.js', '/js/timer.js', '/js/lock.js', '/js/views.js'
+  '/js/report.js', '/js/notify.js', '/js/timer.js', '/js/lock.js', '/js/views.js', '/js/track.js'
 ];
 
 self.addEventListener('install', (ev) => {

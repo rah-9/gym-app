@@ -1,6 +1,7 @@
 /* Weekly report: numbers, plain text, Word (.doc) and PDF downloads. */
 import { S } from './store.js';
 import { planFor, dayRead, dayStats, dayStatus, counts, streak, bestStreak, monthStats, totalWorkoutDays, workedOut, EX_NAMES, STATUS_LABEL, STEP_GOAL, bodyStats, deadlineText, sessionMinutes, penaltyWeek, missedWeek } from './plan.js';
+import { weekVolume, weekCheck, strengthTrend, weekActive, weekProtein, calorieTarget } from './track.js';
 import { esc, fmt, fromKey, addDays, todayKey, weekDays, dow, num, download, toast, DAY_NAMES, DAY_SHORT } from './util.js';
 
 const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
@@ -65,7 +66,8 @@ export function reportData(ws) {
     mealsPct: mealsTotal ? Math.round(mealsDone / mealsTotal * 100) : 0,
     stepsTotal: stepsTotal, stepsDays: stepsDays, stepsGoal: stepsGoal,
     stepsAvg: stepsDays ? Math.round(stepsTotal / stepsDays) : 0,
-    weights: weights, body: body, lastBody: lastBody, verdict: verdict, streak: streak(asOf)
+    weights: weights, body: body, lastBody: lastBody, verdict: verdict, streak: streak(asOf),
+    volume: weekVolume(ws), check: weekCheck(ws), strength: strengthTrend(ws), active: weekActive(ws), protein: weekProtein(ws), calories: calorieTarget(bodyStats(asOf))
   };
 }
 
@@ -98,6 +100,16 @@ export function reportText(r) {
       L.push('- ' + w.name + ': ' + w.now + ' kg' + (w.last != null ? ' (last ' + w.last + ' kg)' : ''));
     });
   }
+  if (r.strength.length) {
+    L.push(''); L.push('STRENGTH (estimated max, last 8 weeks)');
+    r.strength.forEach(function (x) { L.push('- ' + x.name + ': ' + (x.first !== '-' ? x.first + ' -> ' : '') + x.now + ' kg (' + x.chTxt + ')'); });
+  }
+  L.push(''); L.push('SETS PER MUSCLE (done / planned, target range)');
+  r.volume.forEach(function (g) { L.push('- ' + g.name + ': ' + g.done + ' / ' + g.plan + ' (' + g.min + ' to ' + g.max + ')' + (g.status === 'low' ? ' LOW' : g.status === 'high' ? ' HIGH' : '')); });
+  L.push(''); L.push('RECOVERY: ' + recoveryLine(r));
+  L.push('ACTIVITY: ' + r.active.total + ' of ' + r.active.goal + ' min (cardio ' + r.active.cardio + ', brisk walking ' + r.active.walk + (r.active.est ? ', part estimated' : '') + ')');
+  L.push('PROTEIN: ' + proteinLine(r));
+  if (r.calories) L.push('CALORIES: aim for about ' + num(r.calories.target) + ' kcal a day (maintenance ' + num(r.calories.tdee) + ')');
   const dtx = deadlineText(r.bodyStats);
   if (dtx) { L.push(''); L.push('GOAL: ' + dtx.head); L.push(dtx.body); }
   if (r.body.length) {
@@ -108,6 +120,17 @@ export function reportText(r) {
   return L.join('\n');
 }
 
+
+function recoveryLine(r) {
+  const c = r.check;
+  if (!c.days) return 'No check-ins this week.';
+  return c.days + ' check-ins, sleep ' + c.sleep + ' h, soreness ' + c.sore + '/5, energy ' + c.energy + '/5, joint pain ' + c.painDays + ' days, lighter days ' + c.lighterDays + (c.deload ? ', deload week' : '');
+}
+function proteinLine(r) {
+  const p = r.protein;
+  if (!p.days) return 'Not logged. Target ' + p.target + ' g a day.';
+  return 'average ' + p.avg + ' g a day, target ' + p.target + ' g, hit on ' + p.hit + ' of ' + p.days + ' days logged';
+}
 
 export function bestLabel(b) {
   if (!b.days) return '0 days';
@@ -235,6 +258,17 @@ export function docReport(r) {
     const ch = weightChange(w), col = w.last == null ? PC.muted : w.now > w.last ? PC.up : w.now < w.last ? PC.down : PC.muted;
     return '<tr' + (i % 2 ? ' style="background:#fafafc"' : '') + '><td>' + esc(w.name) + '</td><td><b>' + w.now + ' kg</b></td><td>' + (w.last != null ? w.last + ' kg' : '-') + '</td><td style="color:' + col + ';font-weight:bold">' + ch + '</td></tr>';
   }).join('') + '</table>' : '<p style="color:' + PC.muted + '">No weights logged this week.</p>');
+  // strength trend
+  if (r.strength.length) h += h2('Strength trend (estimated max)') + '<table class="t"><tr><th>Lift</th><th>8 weeks ago or first</th><th>Now</th><th>Change</th></tr>' + r.strength.map((x) =>
+    '<tr><td>' + esc(x.name) + '</td><td>' + x.first + ' kg</td><td><b>' + x.now + ' kg</b></td><td style="font-weight:bold;color:' + (x.change > 0 ? PC.up : x.change < 0 ? PC.down : PC.muted) + '">' + x.chTxt + '</td></tr>').join('') + '</table>';
+  // sets per muscle
+  h += h2('Sets per muscle') + '<table class="t"><tr><th>Muscle</th><th>Done</th><th>Planned</th><th>Target</th><th>Status</th></tr>' + r.volume.map((g) =>
+    '<tr><td>' + esc(g.name) + '</td><td><b>' + g.done + '</b></td><td>' + g.plan + '</td><td>' + g.min + ' to ' + g.max + '</td><td style="font-weight:bold;color:' + (g.status === 'ok' ? PC.up : g.status === 'low' ? PC.down : PC.partialBorder) + '">' + (g.status === 'ok' ? 'In range' : g.status === 'low' ? 'Below' : 'Above') + '</td></tr>').join('') + '</table>';
+  // recovery, activity, nutrition
+  h += h2('Recovery, activity and nutrition') + '<table class="t">' + [['Recovery', recoveryLine(r)],
+    ['Activity minutes', r.active.total + ' of ' + r.active.goal + ' (cardio ' + r.active.cardio + ', brisk walking ' + r.active.walk + (r.active.est ? ', part estimated from steps' : '') + ')'],
+    ['Protein', proteinLine(r)], ['Calories', r.calories ? 'Aim for about ' + num(r.calories.target) + ' kcal a day (maintenance ' + num(r.calories.tdee) + ')' : 'Add height and age in the app']]
+    .map((x) => '<tr><td style="width:30%;color:' + PC.muted + '">' + x[0] + '</td><td>' + esc(x[1]) + '</td></tr>').join('') + '</table>';
   // missed workouts
   h += h2('Missed workouts') + (r.missedW.items.length
     ? '<table class="t"><tr><th>Day</th><th>Workout</th><th>Make-up done</th><th>Points back</th><th>Status</th></tr>' + r.missedW.items.map((t) => '<tr><td>' + DAY_SHORT[dow(t.k)] + ' ' + fmt(t.k) + '</td><td>' + esc(t.name) + '</td><td>' + t.done + ' of ' + t.total + '</td><td>' + t.earned + ' of 5</td><td style="font-weight:bold;color:' + (t.status === 'done' ? PC.up : t.status === 'owed' ? PC.down : PC.muted) + '">' + (t.status === 'done' ? 'Made up' : t.status === 'owed' ? 'Not made up' : 'Make-up pending') + '</td></tr>').join('') + '</table>'
@@ -386,6 +420,44 @@ export function pdfReport(r) {
       r.weights.forEach((w, i) => row([w.name, w.now + ' kg', w.last != null ? w.last + ' kg' : '-', weightChange(w)],
         { fill: i % 2 ? '#fafafc' : null, chColor: w.last == null ? PC.muted : w.now > w.last ? PC.up : w.now < w.last ? PC.down : PC.muted }));
     } else { font(9.5, 'normal', PC.muted); doc.text('No weights logged this week.', M, y + 4); y += 12; }
+
+    // Strength trend
+    if (r.strength.length) {
+      heading('Strength trend (estimated max)');
+      r.strength.forEach((x) => {
+        need(18); font(9.5, 'normal', PC.ink); doc.text(x.name, M, y + 10);
+        font(9.5, 'bold', PC.ink); doc.text((x.first !== '-' ? x.first + '  ->  ' : '') + x.now + ' kg', W - M - 80, y + 10, { align: 'right' });
+        font(9.5, 'bold', x.change > 0 ? PC.up : x.change < 0 ? PC.down : PC.muted); doc.text(x.chTxt, W - M, y + 10, { align: 'right' });
+        y += 16;
+      });
+    }
+
+    // Sets per muscle: bar with the target band
+    heading('Sets per muscle (done / planned)');
+    const bx = M + 110, bw = CW - 110 - 70;
+    r.volume.forEach((g) => {
+      need(18);
+      const max = Math.max(24, g.max + 4);
+      font(9, 'normal', PC.ink); doc.text(g.name, M, y + 10);
+      doc.setFillColor(PC.line); doc.roundedRect(bx, y + 3, bw, 8, 4, 4, 'F');
+      doc.setFillColor('#dcd6ff'); doc.rect(bx + bw * g.min / max, y + 3, bw * (g.max - g.min) / max, 8, 'F');
+      const col = g.status === 'ok' ? PC.accent : g.status === 'low' ? (r.we >= todayKey() ? PC.muted : PC.down) : PC.partialBorder;
+      doc.setFillColor(col); doc.roundedRect(bx, y + 5, Math.max(3, bw * Math.min(1, g.done / max)), 4, 2, 2, 'F');
+      font(9, 'bold', col); doc.text(g.done + ' / ' + g.plan, W - M, y + 10, { align: 'right' });
+      y += 17;
+    });
+    font(8, 'normal', PC.muted); doc.text('Shaded band = target range. Direct sets only.', M, y + 6); y += 10;
+
+    // Recovery, activity, nutrition
+    heading('Recovery, activity and nutrition');
+    [['Recovery', recoveryLine(r)], ['Activity', r.active.total + ' of ' + r.active.goal + ' min (cardio ' + r.active.cardio + ', brisk walking ' + r.active.walk + (r.active.est ? ', part estimated' : '') + ')'],
+      ['Protein', proteinLine(r)], ['Calories', r.calories ? 'about ' + num(r.calories.target) + ' kcal a day (maintenance ' + num(r.calories.tdee) + ')' : 'add height and age in the app']].forEach((x) => {
+      const lines = doc.splitTextToSize(x[1], CW - 90);
+      need(lines.length * 12 + 6);
+      font(8.5, 'bold', PC.muted); doc.text(x[0].toUpperCase(), M, y + 10);
+      font(9.5, 'normal', PC.ink); lines.forEach((l, i) => doc.text(l, M + 90, y + 10 + i * 12));
+      y += lines.length * 12 + 6;
+    });
 
     // Missed workouts
     heading('Missed workouts');
