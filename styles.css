@@ -1077,3 +1077,5 @@ button.cal-cell:active { transform: scale(0.94); }
 .jmood.m4, .jmood.m5 { color: var(--accent); }
 .jaudio audio { width: 100%; height: 40px; }
 .jdel { justify-self: end; }
+.steps-help { margin: 0; padding: 0 14px 4px 32px; display: grid; gap: 6px; font-size: 13px; color: var(--ink-2); }
+.phonecard details.fold .chip { margin: 0 14px 12px; }

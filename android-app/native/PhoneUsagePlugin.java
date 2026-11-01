@@ -54,6 +54,15 @@ public class PhoneUsagePlugin extends Plugin {
         call.resolve();
     }
 
+    /** App info page, where the three-dot menu has "Allow restricted settings" for sideloaded apps. */
+    @PluginMethod
+    public void openAppInfo(PluginCall call) {
+        Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + getContext().getPackageName()));
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getContext().startActivity(i);
+        call.resolve();
+    }
+
     /** Summary for the day that starts at dayStart (local midnight, ms). */
     @PluginMethod
     public void summary(PluginCall call) {

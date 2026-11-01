@@ -76,6 +76,7 @@ export async function readActivity() {
 /* ---------- phone use (our own PhoneUsage plugin, Android Usage Access) ---------- */
 export async function usageAllowed() { try { return !!(await call('PhoneUsage', 'hasAccess')).granted; } catch (e) { return false; } }
 export const openUsageSettings = () => call('PhoneUsage', 'openAccessSettings');
+export const openAppInfo = () => call('PhoneUsage', 'openAppInfo');
 export async function usageSummary(dayStartMs) { return call('PhoneUsage', 'summary', { dayStart: dayStartMs }); }
 export const scheduleSummaries = (o) => call('PhoneUsage', 'scheduleSummaries', o).catch(() => {});
 

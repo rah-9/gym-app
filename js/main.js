@@ -257,6 +257,7 @@ const ACTIONS = {
     save(); render(); toast(isDeload(todayKey()) ? 'Deload on: half the sets this week.' : 'Training normal this week.');
   },
   'steps-connect': () => syncSteps(true).then(() => { if (ui.health && ui.health.allowed) toast('Phone data connected.'); else if (ui.health && !ui.health.avail) toast('Install Health Connect first.'); else toast('Allow steps in Health Connect.'); }),
+  'app-info': () => native.openAppInfo().catch(() => toast('Open Settings > Apps > FitTrack.')),
   'usage-open': () => native.openUsageSettings().catch(() => toast('Open Settings > Apps > Special access > Usage access.')),
   'save-sleep': () => {
     const bed = ($('#sl-bed') || {}).value, wake = ($('#sl-wake') || {}).value;

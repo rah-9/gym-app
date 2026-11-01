@@ -927,7 +927,13 @@ function phoneCard(k) {
   if (h.usage === undefined) return '';
   if (!h.usage) return '<div class="card phonecard"><div class="steps-top"><span class="name">Phone and sleep</span></div>' +
     '<p class="tip">See your screen time, hours away from the phone, unlocks, and last night\'s sleep worked out from when the screen stayed off. Android asks you to switch on Usage access for FitTrack once. Nothing leaves your phone.</p>' +
-    '<button type="button" class="chip" data-action="usage-open">Allow usage access</button></div>';
+    '<button type="button" class="chip" data-action="usage-open">Allow usage access</button>' +
+    '<details class="fold"><summary>Switch is greyed out ("restricted setting")?</summary><ol class="steps-help">' +
+    '<li>Android blocks this for apps not installed from the Play Store until you allow it once.</li>' +
+    '<li>Tap <b>Open app info</b> below, then the three-dot menu at the top right, then <b>Allow restricted settings</b>, and confirm with your PIN or fingerprint.</li>' +
+    '<li>Come back and tap <b>Allow usage access</b> again. The switch now works.</li>' +
+    '<li>No three-dot menu? Some OnePlus, Oppo and Realme phones show it as a line on the app info page, or under Settings > Privacy > Special app access.</li></ol>' +
+    '<button type="button" class="chip" data-action="app-info">Open app info</button></details></div>';
   const p = dayRead(k).phone;
   if (!p) return '';
   const sp = sleepPlan();
