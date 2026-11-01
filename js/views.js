@@ -9,6 +9,7 @@ import {
 import { weekVolume, CHECK_FIELDS, checkOf, checkComplete, lighterReasons, weekCheck, strengthTrend, dayE1rm, dayActive, weekActive, FOODS, foodInfo, dayProtein, proteinTarget, weekProtein, calorieTarget, latestWeight, ACTIVITY, PROTEIN_PER_KG } from './track.js';
 import { reportData, bestLabel } from './report.js';
 import * as notify from './notify.js';
+import { isNativeApp } from './native.js';
 import { $, esc, fmt, keyOf, fromKey, addDays, todayKey, weekStartOf, weekDays, dow, num, restLabel, clockTime, DAY_NAMES, DAY_SHORT } from './util.js';
 
 export const ui = { view: 'today', selDate: todayKey(), reportWs: weekStartOf(todayKey()), open: {} };
@@ -276,6 +277,7 @@ function renderToday() {
   const steps = d.steps || '';
   body += '<h2>Daily habits</h2><div class="card stepscard"><div class="steps-top"><label class="name" for="steps-in">Steps today</label>' +
     '<label class="kg big"><input type="number" inputmode="numeric" min="0" max="100000" step="100" id="steps-in" data-steps="1" value="' + esc(steps) + '" placeholder="0"><span>steps</span></label></div>' +
+    phoneStepsRow(k) +
     '<div class="bar"><span id="steps-bar" style="width:' + stepsPct(steps, stepGoalFor(k)) + '%"></span></div><div class="tip" id="steps-note">' + stepsNote(steps, stepGoalFor(k)) + '</div>' + briskRow(k) + '</div>';
   const water = d.water || 0;
   body += '<div class="card watercard"><div class="steps-top"><span class="name">Water</span>' +
@@ -886,4 +888,16 @@ function numbersSection() {
         (cal.advice ? '<p class="cal-advice">' + esc(cal.advice) + '</p>' : '') +
         '<p class="muted small">Mifflin-St Jeor x ' + ACTIVITY + ' (moderate activity). About 500 kcal under maintenance, more only if your goal date needs it, never more than 25% or below BMR. It is an estimate: your weekly weigh-ins decide the real number.</p>'
       : '<p class="muted small">' + (w ? 'Add height and age to get your calorie target.' : 'Log your weight on Today, then add height and age.') + '</p>') + '</div>';
+}
+
+// Android app: where the steps come from.
+function phoneStepsRow(k) {
+  if (!isNativeApp()) return '';
+  const h = ui.health;
+  if (!h) return '<p class="phone-steps muted small">Checking phone steps...</p>';
+  if (!h.avail) return '<div class="phone-steps"><span class="muted small">Auto steps need the Health Connect app.</span><button type="button" class="chip" data-action="steps-install">Install Health Connect</button></div>';
+  if (!h.allowed) return '<div class="phone-steps"><span class="muted small">Let the app read steps from your phone, no typing.</span><button type="button" class="chip" data-action="steps-connect">Connect phone steps</button></div>';
+  const d = dayRead(k);
+  return '<div class="phone-steps"><span class="dot-ok" aria-hidden="true"></span><span class="muted small">' + (d.stepsSrc === 'phone' ? 'From your phone' : 'Phone connected') + (h.at ? ', synced ' + clockTime(h.at) : '') + '</span>' +
+    '<button type="button" class="linkbtn" data-action="steps-connect">Sync now</button></div>';
 }

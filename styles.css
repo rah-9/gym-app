@@ -1042,3 +1042,6 @@ button.cal-cell:active { transform: scale(0.94); }
 .deload-row p { margin: 2px 0 0; }
 .deload-row .small-btn { margin-top: 0; flex: none; }
 .mode-tag + .linkbtn { display: inline; margin-left: 4px; }
+.phone-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 2px 0 0; }
+.phone-steps .chip { height: 30px; font-size: 13px; }
+.phone-steps .dot-ok { background: var(--accent); }

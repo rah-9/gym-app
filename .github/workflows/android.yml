@@ -1,0 +1,49 @@
+name: Android app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'js/**'
+      - 'styles.css'
+      - 'index.html'
+      - 'icons/**'
+      - 'android-app/**'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: android-actions/setup-android@v3
+      - name: Image tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick
+      - name: Build APK
+        working-directory: android-app
+        run: |
+          npm install --no-audit --no-fund
+          bash scripts/build-www.sh
+          npx cap add android
+          node scripts/patch-android.mjs
+          npx cap sync android
+          mkdir -p ~/.android && cp signing/debug.keystore ~/.android/debug.keystore
+          cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon -q
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/gymlog.apk"
+      - name: Publish to the "android" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view android >/dev/null 2>&1 || gh release create android --title "Gym log Android app" --notes "Latest Android build. Download gymlog.apk on your phone and install it."
+          gh release upload android gymlog.apk --clobber

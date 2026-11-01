@@ -19,7 +19,7 @@ const ready = () => (supported() ? navigator.serviceWorker.ready : Promise.rejec
 // Register the worker and listen for taps on notification buttons (+15 s, Skip).
 export function init(on) {
   handlers = on || {};
-  if (!('serviceWorker' in navigator)) return;
+  if (!('serviceWorker' in navigator) || (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())) return;
   navigator.serviceWorker.register('/sw.js').catch(() => { /* offline or blocked */ });
   navigator.serviceWorker.addEventListener('message', (ev) => {
     const m = ev.data || {};

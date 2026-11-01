@@ -1,0 +1,21 @@
+{
+  "name": "gymlog-android",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Android wrapper for Gym log, adds phone steps from Health Connect",
+  "scripts": {
+    "www": "bash scripts/build-www.sh",
+    "android:add": "cap add android && node scripts/patch-android.mjs",
+    "sync": "cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/filesystem": "8.1.5",
+    "@capacitor/share": "8.0.3",
+    "capacitor-health": "8.4.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0"
+  }
+}

@@ -66,6 +66,16 @@ Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
   never more than 25% or below BMR), adjusted by your weigh-in trend.
 - `js/track.js` holds this logic.
 
+## Android app (automatic steps)
+
+`android-app/` wraps this same website as an Android app with Capacitor. It reads steps from Health Connect,
+so the steps box fills itself (today and the last 7 days) every time the app opens or comes back to the front.
+Reports and backups open the share sheet in the app.
+
+- GitHub Actions (`.github/workflows/android.yml`) builds `gymlog.apk` on every push to main and attaches it to the `android` release.
+- It is signed with the fixed key in `android-app/signing/` (personal sideload key), so new builds install over the old one.
+- Local build: `cd android-app && npm install && npm run www && npm run android:add && npm run sync`, then open `android/` in Android Studio.
+
 ## Where the data lives
 
 Everything is stored locally on the phone/browser you use. Nothing is sent to any server.

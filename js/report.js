@@ -528,7 +528,7 @@ export function pdfReport(r) {
       doc.text('Gym log  |  ' + fmt(r.ws) + ' to ' + fmt(r.we), M, H - 22);
       doc.text('Page ' + i + ' of ' + pages, W - M, H - 22, { align: 'right' });
     }
-    doc.save('gym-report-' + r.ws + '.pdf');
+    download('gym-report-' + r.ws + '.pdf', doc.output('blob'), 'application/pdf');
     toast('PDF downloaded.');
   }).catch(function () { toast('Could not load the PDF maker. Check internet, or use Word.'); });
 }

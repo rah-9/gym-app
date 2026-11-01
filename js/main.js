@@ -3,6 +3,7 @@ import { S, save, backupNow, checkBackupSchedule, autoRestore, restoreLatest, im
 import { setDeload, isDeload, planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct, streak, monthStats, bestKg, sessionMinutes, EX_NAMES, WATER_GOAL, noteTarget, treatInfo, treatPoints, ptsLabel, balanceFor, stepGoalFor, treatDays } from './plan.js';
 import { reportData, reportText, docReport, pdfReport } from './report.js';
 import { foodInfo } from './track.js';
+import * as native from './native.js';
 import { ui, render, stepsNote, daySheetHtml, noteStatus, sessionLabel, treatSheetHtml } from './views.js';
 import { startRest, addRest, setRestEnd, stopRest } from './timer.js';
 import { initLock, isUnlocked, showLock, lockNow, recordActivity } from './lock.js';
@@ -250,6 +251,9 @@ const ACTIONS = {
     });
     save(); render(); toast(isDeload(todayKey()) ? 'Deload on: half the sets this week.' : 'Training normal this week.');
   },
+  'steps-connect': () => syncSteps(true).then(() => { if (ui.health && ui.health.allowed) toast('Phone steps connected.'); else if (ui.health && !ui.health.avail) toast('Install Health Connect first.'); else toast('Allow steps in Health Connect.'); }),
+  'steps-install': () => native.installHealthConnect(),
+  'steps-settings': () => native.openHealthConnect(),
   'check-edit': () => { ui.checkEdit = ui.selDate; render(); },
   lighter: (el) => {
     const d = dayWrite(ui.selDate);
@@ -394,6 +398,7 @@ document.addEventListener('input', (ev) => {
   else if (t.dataset.steps) {
     const d = dayWrite(ui.selDate), n = parseInt(t.value, 10) || 0;
     d.steps = n > 0 ? n : '';
+    d.stepsSrc = 'typed';
     d.habits.steps = n >= STEP_GOAL;
     save();
     const b = $('#steps-bar'), nt = $('#steps-note');
@@ -440,7 +445,42 @@ function showApp() {
   ui.reportWs = weekStartOf(ui.selDate);
   requestPersistentStorage();
   render();
+  syncSteps(false);
 }
+
+/* ---------- phone steps (Android app only) ----------
+   Reads today's and the last 7 days' steps from Health Connect whenever the app is opened or comes back. */
+let syncing = false;
+async function syncSteps(ask) {
+  if (!native.isNativeApp() || syncing) return;
+  syncing = true;
+  try {
+    const avail = await native.healthAvailable();
+    let allowed = avail && await native.stepsAllowed();
+    if (avail && !allowed && ask) allowed = await native.askSteps();
+    ui.health = { avail, allowed, at: ui.health && ui.health.at };
+    if (allowed) {
+      const map = await native.readSteps(7);
+      let changed = false;
+      Object.keys(map).forEach((k) => {
+        const v = map[k];
+        const cur = S.days[k];
+        if (!v && !cur) return;
+        const d = dayWrite(k);
+        const typed = d.stepsSrc !== 'phone' ? parseInt(d.steps, 10) || 0 : 0;
+        const val = Math.max(v, typed);
+        if (val && (parseInt(d.steps, 10) || 0) !== val) { d.steps = val; changed = true; }
+        if (val === v && v) d.stepsSrc = 'phone';
+        d.habits.steps = val >= STEP_GOAL;
+      });
+      ui.health.at = Date.now();
+      if (changed) save();
+    }
+  } catch (e) { ui.health = Object.assign({}, ui.health, { error: String(e && e.message || e) }); }
+  syncing = false;
+  if (!$('#root').hidden && !(document.activeElement && document.activeElement.tagName === 'INPUT')) render();
+}
+setInterval(() => { if (document.visibilityState === 'visible') syncSteps(false); }, 5 * 60 * 1000);
 
 // A new day starts a fresh list: move to it when the date changes while the app stays open.
 let lastDay = todayKey();
@@ -498,6 +538,7 @@ document.addEventListener('visibilitychange', () => {
   if (!isUnlocked()) { showLock(); return; }
   checkNewDay();
   checkBackupSchedule();
+  syncSteps(false);
 });
 
 if (isUnlocked()) {

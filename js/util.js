@@ -1,4 +1,5 @@
 /* Small helpers shared by every module: dates, formatting, DOM, toast, downloads. */
+import { isNativeApp, saveFile } from './native.js';
 
 export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 export const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -43,6 +44,8 @@ export function toast(msg) {
 
 export function download(name, text, type) {
   const blob = new Blob([text], { type: type || 'text/plain' });
+  // In the Android app, files go through the share sheet (Save to Files, Drive, WhatsApp).
+  if (isNativeApp()) { saveFile(name, blob).catch(() => toast('Could not save the file.')); return; }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
