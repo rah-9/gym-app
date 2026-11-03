@@ -47,6 +47,7 @@ public class FitNotify {
     static final String A_REST_OVER = "com.rahul.gymlog.REST_OVER";
     static final String A_START = "com.rahul.gymlog.START_WORKOUT";
     static final String A_SNOOZE = "com.rahul.gymlog.SNOOZE";
+    static final String A_UNDO = "com.rahul.gymlog.UNDO";
 
     static final long MIN = 60_000L;
 
@@ -199,29 +200,37 @@ public class FitNotify {
                 : have + " of " + goal + " glasses so far. " + (goal - have) + " to go.";
             post(c, ID_WATER, builder(c, CH_REMIND, ID_WATER, "Drink a glass of water", text)
                 .setAutoCancel(true)
-                .addAction(0, "Drank a glass", action(c, A_WATER_ADD, 9101, null, 1))
-                .addAction(0, "Snooze 30 min", action(c, A_WATER_SNOOZE, 9102, null, 30))
+                .addAction(0, "+1 glass", action(c, A_WATER_ADD, 9101, null, 1))
+                .addAction(0, "+2 glasses", action(c, A_WATER_ADD, 9103, null, 2))
                 .build());
         }
         scheduleWater(c);
     }
 
-    static void addWater(Context c) {
+    /** Add (or with a negative n, take back) glasses straight from the notification. */
+    static void addWater(Context c, int n) {
         JSONObject s = state(c);
         String day = today();
-        int have = waterHave(s) + 1, goal = s.optInt("waterGoal", 12);
+        int before = waterHave(s), have = Math.max(0, Math.min(20, before + n)), goal = s.optInt("waterGoal", 12);
+        int delta = have - before;
         long now = System.currentTimeMillis();
+        if (delta == 0) { cancel(c, ID_WATER); return; }
         try {
-            s.put("date", day); s.put("water", have); s.put("waterAt", now);
+            s.put("date", day); s.put("water", have);
+            if (delta > 0) s.put("waterAt", now);
             JSONObject ev = new JSONObject();
-            ev.put("t", "water"); ev.put("date", day); ev.put("n", 1); ev.put("at", now);
+            ev.put("t", "water"); ev.put("date", day); ev.put("n", delta); ev.put("at", now);
             queue(c, ev);
         } catch (JSONException ignored) { }
         saveState(c, s);
-        prefs(c).edit().putLong("waterLast", now).remove("waterSnooze").apply();
-        String title = have >= goal ? "Water goal hit" : "Glass logged";
-        String text = have >= goal ? have + " of " + goal + " glasses. Well done." : have + " of " + goal + " glasses. Next reminder in about " + waterGap(s, have, now) + " min.";
-        post(c, ID_WATER, builder(c, CH_WORKOUT, ID_WATER, title, text).setAutoCancel(true).setTimeoutAfter(6000).build());
+        if (delta > 0) prefs(c).edit().putLong("waterLast", now).remove("waterSnooze").apply();
+        String title = delta < 0 ? "Glass removed" : have >= goal ? "Water goal hit" : (delta == 1 ? "Glass logged" : delta + " glasses logged");
+        String text = have >= goal && delta > 0 ? have + " of " + goal + " glasses. Well done."
+            : have + " of " + goal + " glasses. Next reminder in about " + waterGap(s, have, now) + " min.";
+        NotificationCompat.Builder b = builder(c, CH_WORKOUT, ID_WATER, title, text).setAutoCancel(true).setTimeoutAfter(15000);
+        if (delta > 0) b.addAction(0, "Undo", action(c, A_WATER_ADD, 9102, null, -delta));
+        else b.addAction(0, "+1 glass", action(c, A_WATER_ADD, 9101, null, 1));
+        post(c, ID_WATER, b.build());
         scheduleWater(c);
     }
 
@@ -295,8 +304,10 @@ public class FitNotify {
         if (cur == null) {
             if (prefs(c).getString("doneShown", "").equals(today())) { cancel(c, ID_WORKOUT); return; }
             prefs(c).edit().putString("doneShown", today()).apply();
-            post(c, ID_WORKOUT, builder(c, CH_REMIND, ID_WORKOUT, head + " complete", "All " + total + " items done. Great work. Refuel with protein.")
-                .setAutoCancel(true).setTimeoutAfter(30 * MIN).build());
+            NotificationCompat.Builder done1 = builder(c, CH_REMIND, ID_WORKOUT, head + " complete", "All " + total + " items done. Great work. Refuel with protein.")
+                .setAutoCancel(true).setTimeoutAfter(30 * MIN);
+            if (today().equals(prefs(c).getString("undoDay", ""))) done1.addAction(0, "Undo", action(c, A_UNDO, 9203, null, 0));
+            post(c, ID_WORKOUT, done1.build());
             return;
         }
 
@@ -318,10 +329,11 @@ public class FitNotify {
         String id = cur.optString("id");
         if (sets > 1) {
             b.addAction(0, "Set " + (sd + 1) + " done", action(c, A_SET, 9201, id, 0));
-            b.addAction(0, "Whole exercise done", action(c, A_ITEM, 9202, id, 0));
+            b.addAction(0, "Exercise done", action(c, A_ITEM, 9202, id, 0));
         } else {
             b.addAction(0, "Done", action(c, A_ITEM, 9202, id, 0));
         }
+        if (today().equals(prefs(c).getString("undoDay", ""))) b.addAction(0, "Undo", action(c, A_UNDO, 9203, null, 0));
         post(c, ID_WORKOUT, b.build());
     }
 
@@ -336,6 +348,8 @@ public class FitNotify {
             JSONArray set = it.optJSONArray("set");
             if (set == null) { set = new JSONArray(); it.put("set", set); }
             while (set.length() < sets) set.put(false);
+            prefs(c).edit().putString("undoDay", today()).putString("undoId", id)
+                .putString("undoSet", set.toString()).putBoolean("undoDone", it.optBoolean("done")).apply();
             if (wholeItem || sets <= 1) {
                 for (int i = 0; i < sets; i++) set.put(i, true);
                 it.put("done", true);
@@ -355,6 +369,28 @@ public class FitNotify {
             if (!itemDone(it) && rest > 0) startRest(c, now + rest * 1000L, it.optString("name"));
             else stopRest(c);
         } catch (JSONException ignored) { }
+        postWorkout(c, false);
+    }
+
+    /** Take back the last tick made from the notification. */
+    static void undo(Context c) {
+        SharedPreferences p = prefs(c);
+        if (!today().equals(p.getString("undoDay", ""))) return;
+        String id = p.getString("undoId", "");
+        JSONObject s = state(c), it = find(todayWorkout(s), id);
+        p.edit().remove("undoDay").remove("doneShown").apply();
+        if (it == null) return;
+        try {
+            JSONArray set = new JSONArray(p.getString("undoSet", "[]"));
+            boolean done = p.getBoolean("undoDone", false);
+            it.put("set", set); it.put("done", done);
+            saveState(c, s);
+            JSONObject ev = new JSONObject();
+            ev.put("t", "undo"); ev.put("date", today()); ev.put("id", id); ev.put("set", set); ev.put("done", done);
+            ev.put("at", System.currentTimeMillis());
+            queue(c, ev);
+        } catch (JSONException ignored) { }
+        stopRest(c);
         postWorkout(c, false);
     }
 
@@ -412,11 +448,12 @@ public class FitNotify {
         NotificationCompat.Builder b = builder(c, CH_REMIND, nid, it.optString("title"), it.optString("body")).setAutoCancel(true);
         if (kind.equals("workout")) {
             b.addAction(0, "Start workout", action(c, A_START, 9400 + nid % 100, null, nid));
-            b.addAction(0, "Remind me in 1 h", snooze(c, it, nid, 60));
         } else if (kind.equals("steps")) {
-            b.addAction(0, "Remind me in 1 h", snooze(c, it, nid, 60));
-        } else if (kind.equals("winddown") || kind.equals("sleep")) {
-            b.addAction(0, "In 15 min", snooze(c, it, nid, 15));
+            PendingIntent open = openApp(c, 9600 + nid % 100);
+            if (open != null) b.addAction(0, "Update steps", open);
+        } else if (kind.equals("wake")) {
+            PendingIntent open = openApp(c, 9700 + nid % 100);
+            if (open != null) b.addAction(0, "Weigh in", open);
         }
         post(c, nid, b.build());
     }

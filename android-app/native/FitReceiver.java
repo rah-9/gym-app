@@ -16,7 +16,8 @@ public class FitReceiver extends BroadcastReceiver {
                 FitNotify.rescheduleAll(c); break;
             case FitNotify.A_PLAN: FitNotify.firePlan(c); break;
             case FitNotify.A_WATER: FitNotify.fireWater(c); break;
-            case FitNotify.A_WATER_ADD: FitNotify.addWater(c); break;
+            case FitNotify.A_WATER_ADD: FitNotify.addWater(c, i.getIntExtra("n", 1)); break;
+            case FitNotify.A_UNDO: FitNotify.undo(c); break;
             case FitNotify.A_WATER_SNOOZE: FitNotify.snoozeWater(c, i.getIntExtra("n", 30)); break;
             case FitNotify.A_SET: FitNotify.tick(c, i.getStringExtra("id"), false); break;
             case FitNotify.A_ITEM: FitNotify.tick(c, i.getStringExtra("id"), true); break;

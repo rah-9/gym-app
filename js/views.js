@@ -650,14 +650,14 @@ function remindSection() {
     '<div class="rem-row"><div><b>Drink water</b><div class="muted small">' + (w === -1
       ? 'Smart: your ' + WATER_GOAL + ' glasses spread from 30 min after waking to 1 h before bed, about once an hour. Adjusts to what you drink, stops at the goal.'
       : 'From 30 min after waking to 1 h before bed, stops at ' + WATER_GOAL + ' glasses.') +
-      (isNativeApp() ? ' Tap "Drank a glass" on the notification, no need to open the app.' : '') + '</div></div>' +
+      (isNativeApp() ? ' Tap +1 glass or +2 glasses on the notification, no need to open the app. Undo takes it back.' : '') + '</div></div>' +
     '<span class="segs">' + seg(0, 'Off') + seg(-1, 'Smart') + seg(60, '1 h') + seg(90, '1.5 h') + '</span></div>' +
     '<div class="rem-row"><div><b>Walk for steps</b><div class="muted small">Every 2 hours from 5 PM until ' + num(STEP_GOAL) + ' steps</div></div>' +
     '<button type="button" class="switch' + (steps ? ' on' : '') + '" data-action="remind-steps" role="switch" aria-checked="' + steps + '" aria-label="Steps reminder"></button></div>' +
     (isNativeApp() ? '<div class="rem-row"><div><b>Workout</b><div class="muted small">7 AM and 6:30 PM on training days, skipped once you start</div></div>' +
       '<button type="button" class="switch' + (r.workout !== false ? ' on' : '') + '" data-action="remind-workout" role="switch" aria-checked="' + (r.workout !== false) + '" aria-label="Workout reminder"></button></div>' : '') +
     (isNativeApp()
-      ? '<p class="muted small">Android delivers these even when the app is closed, with buttons right on the notification: Drank a glass, Set done, Start workout, Remind me later. Set up again each time you open or leave the app' + (notify.enabled() ? '.' : '. Turn on notifications below first.') + '</p></div>'
+      ? '<p class="muted small">Android delivers these even when the app is closed, with buttons right on the notification: +1 glass, Set done, Exercise done, Undo, Start workout. Set up again each time you open or leave the app' + (notify.enabled() ? '.' : '. Turn on notifications below first.') + '</p></div>'
       : '<p class="muted small">These come as phone notifications while the app is open or running in the background' + (notify.enabled() ? '' : '. Turn on notifications below to get them in your notification panel') + '. In the Android app they also arrive when it is closed.</p></div>') + sleepSection();
 }
 
@@ -670,7 +670,7 @@ function notifySection() {
     status = 'Blocked for this app. Long-press the app icon, open App info, then Notifications, and allow them. Then come back here.';
   } else if (notify.enabled()) {
     status = isNativeApp()
-      ? 'On. Use the buttons right on each notification: Drank a glass, Set done, Start workout, Remind me later. Taps are saved even when the app is closed.'
+      ? 'On. Use the buttons right on each notification: +1 glass, +2 glasses, Set done, Exercise done, Undo, Start workout. Taps are saved even when the app is closed.'
       : 'On. Workout progress and the rest timer show in your notification panel. "Rest over" arrives even with the screen off.';
     btns = '<button type="button" class="ghost" data-action="notify-test">Send a test</button><button type="button" class="ghost" data-action="notify-off">Turn off</button>';
   } else {
