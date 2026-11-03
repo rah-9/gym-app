@@ -46,8 +46,16 @@ jobs:
           cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon -q
           cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/gymlog.apk"
       - name: Publish to the "android" release
+        # Test builds from other branches only check that the app compiles.
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view android >/dev/null 2>&1 || gh release create android --title "Gym log Android app" --notes "Latest Android build. Download gymlog.apk on your phone and install it."
+          gh release view android >/dev/null 2>&1 || gh release create android --title "Gym log Android app" --notes "Latest Android build. Download gymlog.apk on your phone and install it. After that, the app updates itself from Plan > App updates."
           gh release upload android gymlog.apk --clobber
+          # The app reads this to offer "Update" (version code = build number).
+          NOTES=$(git log -1 --format=%s | cut -c1-200 | jq -R .)
+          printf '{"versionCode":%s,"versionName":"1.%s","notes":%s,"apk":"https://github.com/%s/releases/download/android/gymlog.apk"}\n' \
+            "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_NUMBER" "$NOTES" "$GITHUB_REPOSITORY" > version.json
+          cat version.json
+          gh release upload android version.json --clobber

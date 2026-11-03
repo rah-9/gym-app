@@ -25,6 +25,7 @@ if (!x.includes('READ_STEPS')) {
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application`);
   x = x.replace('</application>', `    <activity
@@ -44,6 +45,12 @@ if (!x.includes('READ_STEPS')) {
                 <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
             </intent-filter>
         </activity-alias>
+        <receiver android:name=".FitReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <receiver android:name=".SummaryReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
@@ -52,8 +59,28 @@ if (!x.includes('READ_STEPS')) {
         </receiver>
     </application>`);
   x = x.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android"', '<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools"');
+  // File sharing for saved reports and for handing a downloaded update to the installer.
+  if (!x.includes('androidx.core.content.FileProvider')) {
+    x = x.replace('</application>', `    <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="\${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
+    </application>`);
+  }
   fs.writeFileSync(man, x);
 }
+const xmlDir = path.join(root, 'android/app/src/main/res/xml');
+fs.mkdirSync(xmlDir, { recursive: true });
+fs.writeFileSync(path.join(xmlDir, 'file_paths.xml'), `<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <external-path name="my_images" path="." />
+    <cache-path name="my_cache_images" path="." />
+    <files-path name="my_files" path="." />
+</paths>
+`);
 
 // Our own plugin: phone usage, sleep estimate, daily summary notifications.
 const javaDir = path.join(root, 'android/app/src/main/java/com/rahul/gymlog');
@@ -67,6 +94,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(PhoneUsagePlugin.class);
+        registerPlugin(FitNotifyPlugin.class);
+        registerPlugin(AppUpdatePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

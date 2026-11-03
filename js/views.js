@@ -310,7 +310,7 @@ function renderToday() {
     opt('next', nextK ? 'Next ' + esc(p.short) + ', ' + DAY_SHORT[dow(nextK)] : 'Next time') + opt('tomorrow', 'Tomorrow') + opt('off', 'Off') + '</span></div>';
   if (k !== today) body += '<button type="button" class="ghost wide" data-action="pick" data-k="' + today + '">Back to today</button>';
 
-  return weekStrip(k) + (k === today ? notifyPrompt() + reminderHtml() : '') + (k === today ? deloadPrompt(k) : '') + hero(k) + (k <= today ? checkCard(k) : '') + body;
+  return weekStrip(k) + (k === today ? updateCard() + notifyPrompt() + reminderHtml() : '') + (k === today ? deloadPrompt(k) : '') + hero(k) + (k <= today ? checkCard(k) : '') + body;
 }
 
 /* ---------- Report ---------- */
@@ -616,19 +616,48 @@ export function treatSheetHtml() {
     '<div class="sheet-actions"><button type="button" class="ghost" data-sheet="close">Cancel</button></div></div>';
 }
 
+/* ---------- app updates (Android app) ---------- */
+function updateCard() {
+  const u = ui.update;
+  if (!isNativeApp() || !u || !u.ready || S.settings.updLater === u.latest.versionCode) return '';
+  return '<div class="notice accent" role="status"><div class="notice-text"><p><b>New version ' + esc(u.latest.versionName) + ' is ready</b></p>' +
+    (u.latest.notes ? '<p class="muted">' + esc(u.latest.notes) + '</p>' : '') +
+    '<p class="muted small">Installs over this one. Your data stays.</p></div>' +
+    '<div class="notice-actions"><button type="button" data-action="app-update">' + (u.downloading ? 'Downloading...' : 'Update') + '</button>' +
+    '<button type="button" class="quiet" data-action="app-later">Later</button></div></div>';
+}
+
+function updateSection() {
+  if (!isNativeApp()) return '';
+  const u = ui.update || {}, cur = u.current ? u.current.versionName : '...';
+  let line;
+  if (u.checking) line = 'Checking for a new version...';
+  else if (u.ready) line = 'Version ' + u.latest.versionName + ' is ready. You have ' + cur + '.';
+  else if (u.latest) line = 'You have the latest version (' + cur + ').';
+  else if (u.error) line = 'Could not check for updates. Check your internet. Installed: ' + cur + '.';
+  else line = 'Installed: ' + cur + '.';
+  return '<h2>App updates</h2><div class="card panel"><p class="panel-text">' + esc(line) + '</p>' +
+    '<p class="muted small">The app checks by itself when you open it. Update downloads the new version and Android installs it over this one, so nothing is deleted.</p>' +
+    '<div class="btnrow">' + (u.ready ? '<button type="button" class="primary" data-action="app-update">' + (u.downloading ? 'Downloading...' : 'Update now') + '</button>' : '') +
+    '<button type="button" class="ghost" data-action="app-check">Check now</button></div></div>';
+}
+
 /* ---------- Plan ---------- */
 function remindSection() {
-  const r = S.settings.remind || {}, w = r.water == null ? 30 : r.water, steps = r.steps !== false;
+  const r = S.settings.remind || {}, w = r.water == null ? -1 : r.water, steps = r.steps !== false;
   const seg = (v, label) => '<button type="button" class="seg' + (w === v ? ' on' : '') + '" data-action="remind-water" data-v="' + v + '">' + label + '</button>';
   return '<h2>Reminders</h2><div class="card panel">' +
-    '<div class="rem-row"><div><b>Drink water</b><div class="muted small">7 AM to 10 PM, stops at ' + WATER_GOAL + ' glasses</div></div>' +
-    '<span class="segs">' + seg(0, 'Off') + seg(30, '30 min') + seg(60, '1 h') + seg(90, '1.5 h') + '</span></div>' +
+    '<div class="rem-row"><div><b>Drink water</b><div class="muted small">' + (w === -1
+      ? 'Smart: your ' + WATER_GOAL + ' glasses spread from 30 min after waking to 1 h before bed, about once an hour. Adjusts to what you drink, stops at the goal.'
+      : 'From 30 min after waking to 1 h before bed, stops at ' + WATER_GOAL + ' glasses.') +
+      (isNativeApp() ? ' Tap "Drank a glass" on the notification, no need to open the app.' : '') + '</div></div>' +
+    '<span class="segs">' + seg(0, 'Off') + seg(-1, 'Smart') + seg(60, '1 h') + seg(90, '1.5 h') + '</span></div>' +
     '<div class="rem-row"><div><b>Walk for steps</b><div class="muted small">Every 2 hours from 5 PM until ' + num(STEP_GOAL) + ' steps</div></div>' +
     '<button type="button" class="switch' + (steps ? ' on' : '') + '" data-action="remind-steps" role="switch" aria-checked="' + steps + '" aria-label="Steps reminder"></button></div>' +
     (isNativeApp() ? '<div class="rem-row"><div><b>Workout</b><div class="muted small">7 AM and 6:30 PM on training days, skipped once you start</div></div>' +
       '<button type="button" class="switch' + (r.workout !== false ? ' on' : '') + '" data-action="remind-workout" role="switch" aria-checked="' + (r.workout !== false) + '" aria-label="Workout reminder"></button></div>' : '') +
     (isNativeApp()
-      ? '<p class="muted small">Android delivers these even when the app is closed. They are planned for the next 2 days each time you open or leave the app' + (notify.enabled() ? '.' : '. Turn on notifications below first.') + '</p></div>'
+      ? '<p class="muted small">Android delivers these even when the app is closed, with buttons right on the notification: Drank a glass, Set done, Start workout, Remind me later. Set up again each time you open or leave the app' + (notify.enabled() ? '.' : '. Turn on notifications below first.') + '</p></div>'
       : '<p class="muted small">These come as phone notifications while the app is open or running in the background' + (notify.enabled() ? '' : '. Turn on notifications below to get them in your notification panel') + '. In the Android app they also arrive when it is closed.</p></div>') + sleepSection();
 }
 
@@ -640,13 +669,15 @@ function notifySection() {
   } else if (perm === 'denied') {
     status = 'Blocked for this app. Long-press the app icon, open App info, then Notifications, and allow them. Then come back here.';
   } else if (notify.enabled()) {
-    status = 'On. Workout progress and the rest timer show in your notification panel. "Rest over" arrives even with the screen off.';
+    status = isNativeApp()
+      ? 'On. Use the buttons right on each notification: Drank a glass, Set done, Start workout, Remind me later. Taps are saved even when the app is closed.'
+      : 'On. Workout progress and the rest timer show in your notification panel. "Rest over" arrives even with the screen off.';
     btns = '<button type="button" class="ghost" data-action="notify-test">Send a test</button><button type="button" class="ghost" data-action="notify-off">Turn off</button>';
   } else {
     status = 'Off. Turn on to see the rest timer and workout progress in your notification panel.';
     btns = '<button type="button" class="primary" data-action="notify-on">Turn on notifications</button>';
   }
-  const hint = perm !== 'unsupported' && !notify.isInstalled()
+  const hint = perm !== 'unsupported' && !isNativeApp() && !notify.isInstalled()
     ? '<p class="muted small">Tip: open the app from its home-screen icon. Notifications work best there.</p>' : '';
   return '<h2>Notifications</h2><div class="card panel"><p class="panel-text">' + esc(status) + '</p>' +
     (btns ? '<div class="btnrow">' + btns + '</div>' : '') + '</div>' + hint;
@@ -727,7 +758,7 @@ function renderPlan() {
     '<li>Every ' + DELOAD_EVERY + 'th week a deload is suggested: half the sets, same weights. You choose at the start of that week, or turn one on below any time.' + nextDeloadText() + '</li>' +
     '<li>Bad sleep, very sore, low energy or joint pain? The daily check-in offers a lighter day: one set less on everything.</li></ul>' + goalLegend() +
     deloadPlanRow() + volumeSection(weekVolume(weekStartOf(todayKey())), 'plan') + numbersSection() +
-    remindSection() + notifySection() + dataSection();
+    remindSection() + notifySection() + updateSection() + dataSection();
 }
 
 /* ---------- performance tracking ---------- */

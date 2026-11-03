@@ -1,6 +1,6 @@
 /* Service worker: makes the installed app work offline, shows notifications,
    and runs the rest countdown so "Rest over" arrives even with the screen off. */
-const CACHE = 'gymlog-v22';
+const CACHE = 'gymlog-v23';
 const SHELL = [
   '/', '/styles.css', '/manifest.webmanifest', '/icon.svg',
   '/icons/icon-192.png', '/icons/icon-512.png', '/icons/badge-96.png',
@@ -103,6 +103,11 @@ self.addEventListener('notificationclick', (ev) => {
       const token = ++rest.token;
       return showRunning().then(() => countdown(token));
     }));
+    return;
+  }
+  if (ev.action === 'water-add') {
+    n.close();
+    ev.waitUntil(tellPage({ type: 'water-add' }));
     return;
   }
   if (ev.action === 'skip') {

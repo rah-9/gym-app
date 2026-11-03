@@ -2,7 +2,7 @@
    of the installed app (Android Chrome, and iPhone on iOS 16.4+ once added to the Home Screen).
    Shows: workout progress after each tick, the rest timer, and "Rest over" with the screen off. */
 import { S, save } from './store.js';
-import { isNativeApp } from './native.js';
+import { isNativeApp, fitShow, fitCancel, fitRestStart, fitRestStop } from './native.js';
 
 /* In the Android app, notifications go through Android directly (LocalNotifications), so they
    also arrive when the app is closed. nativePerm caches Android's answer. */
@@ -41,6 +41,7 @@ export function init(on) {
     const m = ev.data || {};
     if (m.type === 'rest-sync' && handlers.restSync) handlers.restSync(m.end);
     if (m.type === 'rest-cancel' && handlers.restCancel) handlers.restCancel();
+    if (m.type === 'water-add' && handlers.waterAdd) handlers.waterAdd();
   });
 }
 
@@ -75,15 +76,13 @@ export function disable() {
 
 export function show(tag, title, body, opts) {
   if (!enabled()) return Promise.resolve();
-  if (isNativeApp()) {
-    return N('schedule', { notifications: [{ id: tagId(tag), title, body, channelId: 'fit_main', schedule: { at: new Date(Date.now() + 500).toISOString(), allowWhileIdle: true } }] }).catch(() => {});
-  }
+  if (isNativeApp()) return fitShow(tagId(tag), title, body);
   const o = Object.assign({ tag, body, icon: ICON, badge: BADGE, silent: true, renotify: false, data: { url: '/' } }, opts || {});
   return ready().then((reg) => reg.showNotification(title, o)).catch(() => { /* ignore */ });
 }
 
 export function close(tag) {
-  if (isNativeApp()) { N('cancel', { notifications: [{ id: tagId(tag) }] }).catch(() => {}); N('removeDeliveredNotifications', { notifications: [{ id: tagId(tag) }] }).catch(() => {}); return; }
+  if (isNativeApp()) { fitCancel(tag === 'workout' ? 8200 : tagId(tag)); return; }
   if (!supported()) return;
   ready().then((reg) => reg.getNotifications({ tag })).then((list) => list.forEach((n) => n.close())).catch(() => {});
 }
@@ -96,7 +95,8 @@ function post(msg) {
 /* ---------- workout progress ---------- */
 // info: { title, done, total, pct, next } built by the caller from today's plan.
 export function workoutProgress(info) {
-  if (!enabled()) return;
+  // The Android app shows its own workout card with Set done buttons (see phone.pushState).
+  if (!enabled() || isNativeApp()) return;
   if (info.done === 0) { close('workout'); return; }
   const complete = info.pct === 100;
   show('workout',
@@ -106,10 +106,6 @@ export function workoutProgress(info) {
 }
 
 /* ---------- rest timer (the worker counts down, so it works with the screen off) ---------- */
-function nativeRest(end, name) {
-  N('cancel', { notifications: [{ id: 9102 }] }).catch(() => {});
-  N('schedule', { notifications: [{ id: 9102, title: 'Rest over', body: 'Next set: ' + (name || 'go'), channelId: 'fit_main', schedule: { at: new Date(end).toISOString(), allowWhileIdle: true } }] }).catch(() => {});
-}
-export function restStart(end, name) { if (!enabled()) return; if (isNativeApp()) nativeRest(end, name); else post({ type: 'rest-start', end, name, icon: ICON, badge: BADGE }); }
-export function restSync(end, name) { if (!enabled()) return; if (isNativeApp()) nativeRest(end, name); else post({ type: 'rest-sync', end, name }); }
-export function restStop() { if (isNativeApp()) { N('cancel', { notifications: [{ id: 9102 }] }).catch(() => {}); return; } post({ type: 'rest-stop' }); }
+export function restStart(end, name) { if (!enabled()) return; if (isNativeApp()) fitRestStart(end, name); else post({ type: 'rest-start', end, name, icon: ICON, badge: BADGE }); }
+export function restSync(end, name) { if (!enabled()) return; if (isNativeApp()) fitRestStart(end, name); else post({ type: 'rest-sync', end, name }); }
+export function restStop() { if (isNativeApp()) { fitRestStop(); return; } post({ type: 'rest-stop' }); }

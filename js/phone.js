@@ -4,7 +4,7 @@
    - Scheduled reminders for the next 2 days: water, steps, workout, wind-down, bedtime, wake up.
    On the website this module does nothing. */
 import { S, save } from './store.js';
-import { planFor, dayWrite, dayRead, hasProgress, STEP_GOAL, stepGoalFor, WATER_GOAL } from './plan.js';
+import { planFor, dayWrite, dayRead, dayStats, hasProgress, requiredItems, findEx, STEP_GOAL, stepGoalFor, WATER_GOAL } from './plan.js';
 import { addDays, todayKey, fromKey } from './util.js';
 import * as native from './native.js';
 
@@ -79,37 +79,89 @@ export async function syncAll(ui, ask, done) {
   if (done) done();
 }
 
+/* ---------- water timing ----------
+   Mode: 0 off, -1 smart (default), or a fixed gap in minutes.
+   Smart spreads the glasses still to drink over the waking time left (wake + 30 min to 1 h before bed),
+   so 12 glasses come about once an hour, never closer than 30 min or further apart than 2 h. */
+export const waterMode = () => { const w = (S.settings.remind || {}).water; return w == null ? -1 : w; };
+export function waterWindow() {
+  const p = sleepPlan(), [wh, wm] = hm(p.wake), [bh, bm] = hm(p.bed);
+  const start = wh * 60 + wm + 30;
+  let end = bh * 60 + bm - 60;
+  if (end <= start) end = Math.min(1439, start + 14 * 60);
+  return { start, end };
+}
+export function waterGap(have, nowMs) {
+  const mode = waterMode();
+  if (mode > 0) return mode;
+  const d = new Date(nowMs || Date.now()), nowMin = d.getHours() * 60 + d.getMinutes();
+  const left = Math.max(1, WATER_GOAL - have);
+  return Math.max(30, Math.min(120, Math.floor((waterWindow().end - nowMin) / left)));
+}
+
+/* ---------- state for the Android notification panel ---------- */
+function workoutSnap(k) {
+  const p = planFor(k), d = dayRead(k);
+  return {
+    title: p.short + ' day',
+    items: requiredItems(k).map((it) => {
+      const e = it.id === 'cardio' ? null : findEx(k, it.id);
+      const sets = e && e.id !== 'warmup' ? Math.max(1, e.sets || 1) : 1;
+      const arr = (d.sets[it.id] || []).slice(0, sets).map(Boolean);
+      while (arr.length < sets) arr.push(false);
+      const reps = e ? (e.id === 'warmup' ? e.reps : sets + ' x ' + e.reps) : p.cardio ? p.cardio.detail : '';
+      return { id: it.id, name: it.name, sets, set: arr, done: !!d.done[it.id], rest: e && sets > 1 ? e.rest || 0 : 0, reps: String(reps || '') };
+    })
+  };
+}
+export function nativeState() {
+  const today = todayKey(), d = dayRead(today), w = waterWindow(), workouts = {};
+  for (let i = 0; i < 3; i++) { const k = addDays(today, i); if (!planFor(k).rest) workouts[k] = workoutSnap(k); }
+  return {
+    date: today, water: d.water || 0, waterAt: d.waterAt || 0, waterGoal: WATER_GOAL, waterMode: waterMode(),
+    startMin: w.start, endMin: w.end, on: S.settings.notify !== false,
+    workouts, active: !planFor(today).rest && hasProgress(today) && dayStats(today).pct < 100
+  };
+}
+export function pushState() { if (native.isNativeApp()) native.fitSync(nativeState()); }
+
 /* Reminders for today and the next 2 days. Rebuilt every time the app opens or you tick something,
-   so a reminder for something already done is dropped. */
+   so a reminder for something already done is dropped. Water is run by the Android side itself,
+   so a glass logged from the notification moves the next reminder. */
 export async function planReminders() {
   if (!native.isNativeApp() || S.settings.notify === false) return;
-  const r = S.settings.remind || {}, water = r.water == null ? 30 : r.water, stepsOn = r.steps !== false, workOn = r.workout !== false;
-  const sp = sleepPlan(), now = Date.now(), today = todayKey(), list = [];
+  const r = S.settings.remind || {}, stepsOn = r.steps !== false, workOn = r.workout !== false;
+  const sp = sleepPlan(), now = Date.now(), today = todayKey(), list = [], water = [];
   let n = 0;
-  const add = (time, title, body) => { if (time > now + 30000 && n < 400) list.push({ id: 20000 + n++, at: time, title, body }); };
+  const add = (time, title, body, kind, to) => { if (time > now + 30000 && n < 400) (to || list).push({ id: 20000 + n++, at: time, title, body, kind }); };
   for (let i = 0; i < 3; i++) {
     const k = addDays(today, i), p = planFor(k), d = dayRead(k), isToday = k === today;
     // Workout
     if (workOn && !p.rest && !(isToday && hasProgress(k))) {
-      add(at(k, '07:00'), 'Today: ' + p.focus, 'Morning window is open. ' + p.exercises.filter((e) => !e.bonus).length + ' exercises + cardio.');
-      add(at(k, '18:30'), 'Still time to train', p.focus + ' is waiting. An evening session counts.');
+      add(at(k, '07:00'), 'Today: ' + p.focus, 'Morning window is open. ' + p.exercises.filter((e) => !e.bonus).length + ' exercises + cardio.', 'workout');
+      add(at(k, '18:30'), 'Still time to train', p.focus + ' is waiting. An evening session counts.', 'workout');
     }
-    // Water
-    if (water > 0 && !(isToday && (d.water || 0) >= WATER_GOAL)) {
-      for (let m = 8 * 60; m <= 21 * 60 + 30; m += water) add(at(k, '00:00', m), 'Water time', 'One glass now. Goal ' + WATER_GOAL + ' glasses a day.');
+    // Water, only for an older app build that cannot run water reminders itself.
+    const have = isToday ? d.water || 0 : 0;
+    if (waterMode() !== 0 && have < WATER_GOAL) {
+      const win = waterWindow();
+      let t = Math.max(at(k, '00:00', win.start), isToday ? now : 0), got = have;
+      while (got < WATER_GOAL && t <= at(k, '00:00', win.end)) { add(t, 'Drink a glass of water', got + ' of ' + WATER_GOAL + ' glasses so far.', 'water', water); got++; t += waterGap(got, t) * 60000; }
     }
     // Steps
     if (stepsOn) {
-      const goal = stepGoalFor(k), have = parseInt(d.steps, 10) || 0;
-      if (!(isToday && have >= goal)) ['17:00', '19:00', '21:00'].forEach((t) => add(at(k, t), 'Steps check', isToday && have ? (goal - have).toLocaleString('en-IN') + ' steps to your goal. A 15 min walk is about 1,500.' : 'Walk after dinner to close your step goal.'));
+      const goal = stepGoalFor(k), have2 = parseInt(d.steps, 10) || 0;
+      if (!(isToday && have2 >= goal)) ['17:00', '19:00', '21:00'].forEach((t) => add(at(k, t), 'Steps check', isToday && have2 ? (goal - have2).toLocaleString('en-IN') + ' steps to your goal. A 15 min walk is about 1,500.' : 'Walk after dinner to close your step goal.', 'steps'));
     }
     // Sleep schedule
     if (sp.on) {
-      add(at(k, sp.bed, -30), 'Wind down', 'Bed at ' + clock12(sp.bed) + '. Phone away, lights low.');
-      add(at(k, sp.bed), 'Time to sleep', 'Aim for ' + sleepHoursPlanned() + ' hours. Same time every night helps most.');
-      add(at(addDays(k, 1), sp.wake), 'Time to wake up', 'Water first, then weigh in and do your check-in.');
+      add(at(k, sp.bed, -30), 'Wind down', 'Bed at ' + clock12(sp.bed) + '. Phone away, lights low.', 'winddown');
+      add(at(k, sp.bed), 'Time to sleep', 'Aim for ' + sleepHoursPlanned() + ' hours. Same time every night helps most.', 'sleep');
+      add(at(addDays(k, 1), sp.wake), 'Time to wake up', 'Water first, then weigh in and do your check-in.', 'wake');
     }
   }
+  native.setPlanFallback(water);
+  pushState();
   await native.replacePlanned(list);
 }
 

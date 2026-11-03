@@ -84,10 +84,35 @@ export const scheduleSummaries = (o) => call('PhoneUsage', 'scheduleSummaries', 
 const LN = (m, o) => call('LocalNotifications', m, o);
 export async function replacePlanned(list) {
   try {
+    // Clear reminders booked the old way (before the app had panel buttons).
     const p = await LN('getPending');
     const old = (p.notifications || []).filter((n) => n.id >= 20000 && n.id < 30000).map((n) => ({ id: n.id }));
     if (old.length) await LN('cancel', { notifications: old });
-    if (list.length) await LN('schedule', { notifications: list.map((n) => ({ id: n.id, title: n.title, body: n.body, channelId: 'fit_main', schedule: { at: new Date(n.at).toISOString(), allowWhileIdle: true } })) });
+    if (await fitPlan(list.map((n) => ({ id: n.id, at: Math.round(n.at), title: n.title, body: n.body, kind: n.kind || '' })))) return true;
+    // Older app build without FitNotify: plain reminders, water included.
+    const all = list.concat(planFallback);
+    if (all.length) await LN('schedule', { notifications: all.map((n) => ({ id: n.id, title: n.title, body: n.body, channelId: 'fit_main', schedule: { at: new Date(n.at).toISOString(), allowWhileIdle: true } })) });
     return true;
   } catch (e) { return false; }
 }
+// Water reminders, used only when the app build is too old to run them itself.
+let planFallback = [];
+export const setPlanFallback = (list) => { planFallback = list; };
+
+/* ---------- actionable notifications (our FitNotify plugin) ----------
+   sync: send today's water and workout so the panel buttons know what to tick.
+   plan: reminders for the next days. drain: taps made in the panel, to apply to the data. */
+const FN = (m, o) => call('FitNotify', m, o);
+export const fitSync = (state) => FN('sync', { state }).catch(() => {});
+export const fitPlan = (items) => FN('plan', { items }).then(() => true, () => false);
+export const fitDrain = () => FN('drain').then((r) => (r && r.events) || [], () => []);
+export const fitShow = (id, title, body) => FN('show', { id, title, body }).catch(() => {});
+export const fitCancel = (id) => FN('cancel', { id }).catch(() => {});
+export const fitRestStart = (end, name) => FN('restStart', { end: Math.round(end), name }).catch(() => {});
+export const fitRestStop = () => FN('restStop').catch(() => {});
+
+/* ---------- app updates (our AppUpdate plugin) ---------- */
+export const UPDATE_URL = 'https://github.com/rah-9/gym-app/releases/download/android/version.json';
+export const appInfo = () => call('AppUpdate', 'info').catch(() => null);
+export const checkUpdate = () => call('AppUpdate', 'check', { url: UPDATE_URL });
+export const installUpdate = (url) => call('AppUpdate', 'install', { url });
