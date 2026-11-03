@@ -168,6 +168,56 @@ function stamp(d, on) {
   d.lastTick = Date.now();
 }
 
+function addWater(k, n, at) {
+  const d = dayWrite(k);
+  d.water = Math.max(0, Math.min(20, (d.water || 0) + n));
+  if (n > 0) d.waterAt = at || Date.now();
+  d.habits.water = d.water >= WATER_GOAL;
+  if (n > 0 && d.water === WATER_GOAL) toast('3 litres done. Water goal hit.');
+}
+
+/* ---------- taps made in the Android notification panel ----------
+   The Android side keeps them in a queue while the app is closed; here they are applied
+   exactly like the same tap inside the app. */
+function applyPanelEvents(events) {
+  if (!events.length) return;
+  const today = todayKey();
+  events.forEach((ev) => {
+    const k = ev.date || today, at = ev.at || Date.now();
+    if (ev.t === 'water') { addWater(k, ev.n || 1, at); return; }
+    const d = dayWrite(k), ex = findEx(k, ev.id);
+    if (ev.t === 'set' && ex) {
+      const arr = (d.sets[ev.id] || []).slice();
+      while (arr.length < ex.sets) arr.push(false);
+      arr[ev.i] = true;
+      d.sets[ev.id] = arr;
+      d.done[ev.id] = arr.every(Boolean);
+    } else if (ev.t === 'done') {
+      d.done[ev.id] = true;
+      if (ex && ex.sets > 1) d.sets[ev.id] = Array(ex.sets).fill(true);
+    } else return;
+    if (k === today) { if (!d.start) d.start = at; d.lastTick = at; }
+  });
+  save();
+  if (!$('#root').hidden && !(document.activeElement && document.activeElement.tagName === 'INPUT')) render();
+  if (ui.selDate === today) celebrate(false);
+  phone.planReminders();
+}
+let draining = false;
+function pullPanelTaps() {
+  if (!native.isNativeApp() || draining) return;
+  draining = true;
+  native.fitDrain().then((evs) => { draining = false; applyPanelEvents(evs); }, () => { draining = false; });
+}
+
+// After any change in the app, send the new state to the Android panel (batched).
+let syncTimer = null;
+function syncPanel() {
+  if (!native.isNativeApp()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(phone.pushState, 400);
+}
+
 function toggleDone(id) {
   const d = dayWrite(ui.selDate);
   d.done[id] = !d.done[id];
@@ -370,14 +420,7 @@ const ACTIONS = {
     toast('Goal set: ' + S.settings.targetKg + ' kg' + (S.settings.targetDate ? ' by ' + fmt(S.settings.targetDate) : '') + '.');
   },
   'clear-date': () => { delete S.settings.targetDate; save(); render(); toast('Target date removed.'); },
-  water: (el) => {
-    const d = dayWrite(ui.selDate);
-    d.water = Math.max(0, Math.min(20, (d.water || 0) + (+el.dataset.n)));
-    d.waterAt = Date.now();
-    d.habits.water = d.water >= WATER_GOAL;
-    save(); render();
-    if (+el.dataset.n > 0 && d.water === WATER_GOAL) toast('3 litres done. Water goal hit.');
-  },
+  water: (el) => { addWater(ui.selDate, +el.dataset.n, Date.now()); save(); render(); },
   'note-for': (el) => {
     const d = dayWrite(ui.selDate);
     d.noteFor = el.dataset.v; save(); render();
@@ -398,6 +441,9 @@ const ACTIONS = {
   'diet-toggle': (el) => { S.settings.dietOpen = !el.parentElement.open; save(); },
   'notify-on': notifyOn,
   'notify-later': () => { S.settings.notifyAsked = true; save(); render(); toast('You can turn them on later in the Plan tab.'); },
+  'app-check': () => checkForUpdate(true),
+  'app-update': installUpdate,
+  'app-later': () => { if (ui.update && ui.update.latest) { S.settings.updLater = ui.update.latest.versionCode; save(); render(); } },
   'notify-off': () => { notify.disable(); render(); toast('Notifications off.'); },
   'notify-test': () => notify.show('hello', 'FitTrack', 'Notifications are working.', { silent: false, renotify: true }),
   'sched-reset': () => { resetSchedule(); save(); render(); toast('Default week restored.'); },
@@ -427,9 +473,10 @@ document.addEventListener('click', (ev) => {
   if (!el) return;
   if (el.dataset.view) { if (ui.view === 'journal' && el.dataset.view !== 'journal') journal.lock(); ui.view = el.dataset.view; render(); top(); return; }
   const fn = ACTIONS[el.dataset.action];
-  if (fn) fn(el);
+  if (fn) { fn(el); syncPanel(); }
 });
 
+document.addEventListener('input', syncPanel);
 document.addEventListener('input', (ev) => {
   const t = ev.target;
   if (t.dataset.kg) { dayWrite(ui.selDate).kg[t.dataset.kg] = t.value; save(); }
@@ -505,8 +552,40 @@ document.addEventListener('change', (ev) => {
   }
 });
 
+/* ---------- app updates (Android app) ----------
+   The app reads version.json from the GitHub release. When a newer build is there, Today shows
+   an Update card; one tap downloads it and opens Android's installer, which updates in place. */
+function checkForUpdate(force) {
+  if (!native.isNativeApp()) return;
+  const now = Date.now();
+  if (!force && ui.update && now - (ui.update.at || 0) < 3 * 3600000) return;
+  ui.update = Object.assign({}, ui.update, { at: now, checking: true });
+  if (force) render();
+  Promise.all([native.appInfo(), native.checkUpdate().catch((e) => ({ error: String((e && e.message) || e) }))]).then(([info, latest]) => {
+    const ok = latest && !latest.error && latest.versionCode;
+    ui.update = { at: now, current: info, latest: ok ? latest : null, error: ok ? '' : (latest && latest.error) || 'no answer',
+      ready: !!(ok && info && latest.versionCode > info.versionCode) };
+    if (force) toast(ui.update.ready ? 'Version ' + latest.versionName + ' is ready to install.' : ok ? 'You have the latest version.' : 'Could not check. Check your internet.');
+    if (!$('#root').hidden && !(document.activeElement && document.activeElement.tagName === 'INPUT')) render();
+  });
+}
+
+function installUpdate() {
+  const u = ui.update;
+  if (!u || !u.latest || u.downloading) return;
+  u.downloading = true; render();
+  toast('Downloading the update...');
+  native.installUpdate(u.latest.apk || 'https://github.com/rah-9/gym-app/releases/download/android/gymlog.apk').then((r) => {
+    u.downloading = false; render();
+    if (r && r.needsPermission) toast('Turn on "Allow from this source" for FitTrack, come back, then tap Update again.');
+    else toast('Tap Update on the next screen. Your data stays.');
+  }, () => { u.downloading = false; render(); toast('Download failed. Check your internet and try again.'); });
+}
+
 /* ---------- start-up ---------- */
 function showApp() {
+  pullPanelTaps();
+  checkForUpdate(false);
   recordActivity();
   ui.selDate = todayKey();
   ui.reportWs = weekStartOf(ui.selDate);
@@ -536,8 +615,11 @@ function checkNewDay() {
 
 notify.init({
   restSync: (end) => setRestEnd(end, true),
-  restCancel: () => stopRest(false, true)
+  restCancel: () => stopRest(false, true),
+  waterAdd: () => { addWater(todayKey(), 1, Date.now()); save(); render(); toast('Glass logged.'); }
 });
+// Pick up taps from the notification panel: on open, and every few seconds while the app is on screen.
+setInterval(() => { if (document.visibilityState === 'visible') pullPanelTaps(); }, 3000);
 initLock(showApp);
 requestPersistentStorage();
 autoRestore().then((restored) => { if (restored && !$('#root').hidden) render(); });
@@ -550,8 +632,8 @@ setInterval(() => { checkNewDay(); checkBackupSchedule(); }, 30000);
    They show in the notification panel when notifications are on, and as a toast in the app.
    A web app can only run these while it is open or kept in the background; a fully closed app
    would need a push server. */
-function nudge(tag, title, body) {
-  notify.show(tag, title, body, { silent: false, renotify: true, vibrate: [80, 40, 80] });
+function nudge(tag, title, body, actions) {
+  notify.show(tag, title, body, { silent: false, renotify: true, vibrate: [80, 40, 80], actions: actions || [] });
   if (document.visibilityState === 'visible' && !$('#root').hidden) toast(body);
 }
 function remindTick() {
@@ -560,11 +642,10 @@ function remindTick() {
   if (h < 7 || h >= 22) return; // quiet from 10 PM to 7 AM, sleep time
   const d = S.days[todayKey()] || {};
   if (S.settings.lastWaterRemind == null) { S.settings.lastWaterRemind = t; S.settings.lastStepsRemind = t; save(); return; }
-  const wInt = r.water == null ? 30 : r.water;
   const water = d.water || 0;
-  if (wInt > 0 && water < WATER_GOAL && t - Math.max(S.settings.lastWaterRemind || 0, d.waterAt || 0) >= wInt * 60000) {
+  if (phone.waterMode() !== 0 && water < WATER_GOAL && t - Math.max(S.settings.lastWaterRemind || 0, d.waterAt || 0) >= phone.waterGap(water, t) * 60000) {
     S.settings.lastWaterRemind = t; save();
-    nudge('water', 'Drink water', 'Time for a glass of water. ' + water + ' of ' + WATER_GOAL + ' glasses today.');
+    nudge('water', 'Drink a glass of water', water + ' of ' + WATER_GOAL + ' glasses today.', [{ action: 'water-add', title: 'Drank a glass' }]);
   }
   const steps = parseInt(d.steps, 10) || 0;
   const goal = stepGoalFor(todayKey());
@@ -578,9 +659,11 @@ setTimeout(remindTick, 8000);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') { phone.planReminders(); if (journal.isOpen()) { journal.lock(); if (ui.view === 'journal') render(); } return; }
   if (!isUnlocked()) { showLock(); return; }
+  pullPanelTaps();
   checkNewDay();
   checkBackupSchedule();
   syncSteps(false);
+  checkForUpdate(false);
 });
 
 if (isUnlocked()) {
