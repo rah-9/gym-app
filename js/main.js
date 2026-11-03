@@ -195,6 +195,12 @@ function applyPanelEvents(events) {
     } else if (ev.t === 'done') {
       d.done[ev.id] = true;
       if (ex && ex.sets > 1) d.sets[ev.id] = Array(ex.sets).fill(true);
+    } else if (ev.t === 'undo') {
+      // Undo on the notification: put the exercise back the way it was before the last tap.
+      const set = (ev.set || []).map(Boolean);
+      if (set.some(Boolean)) d.sets[ev.id] = set; else delete d.sets[ev.id];
+      d.done[ev.id] = !!ev.done;
+      return;
     } else return;
     if (k === today) { if (!d.start) d.start = at; d.lastTick = at; }
   });
@@ -645,7 +651,7 @@ function remindTick() {
   const water = d.water || 0;
   if (phone.waterMode() !== 0 && water < WATER_GOAL && t - Math.max(S.settings.lastWaterRemind || 0, d.waterAt || 0) >= phone.waterGap(water, t) * 60000) {
     S.settings.lastWaterRemind = t; save();
-    nudge('water', 'Drink a glass of water', water + ' of ' + WATER_GOAL + ' glasses today.', [{ action: 'water-add', title: 'Drank a glass' }]);
+    nudge('water', 'Drink a glass of water', water + ' of ' + WATER_GOAL + ' glasses today.', [{ action: 'water-add', title: '+1 glass' }]);
   }
   const steps = parseInt(d.steps, 10) || 0;
   const goal = stepGoalFor(todayKey());
