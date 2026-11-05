@@ -20,7 +20,8 @@ export const ui = { view: 'today', selDate: todayKey(), reportWs: weekStartOf(to
 export const DAY_COLORS = {
   chest: '#f9a8d4', push: '#f9a8d4', arms: '#c4b5fd', back: '#a5b4fc', shoulders: '#fcd34d',
   armsplus: '#ddd6fe', legday: '#93c5fd', legs: '#93c5fd', rest: '#cbd5e1',
-  pushA: '#f9a8d4', pullA: '#a5b4fc', legsA: '#93c5fd', shoback: '#c4b5fd', chestarms: '#fbcfe8', legsB: '#7dd3fc'
+  pushA: '#f9a8d4', pullA: '#a5b4fc', legsA: '#93c5fd', shoback: '#c4b5fd', chestarms: '#fbcfe8', legsB: '#7dd3fc',
+  chestOnly: '#f9a8d4', backOnly: '#a5b4fc', shouldersOnly: '#fcd34d', bicepsOnly: '#c4b5fd', tricepsOnly: '#fbcfe8', legsOnly: '#93c5fd'
 };
 const dayColor = (k) => DAY_COLORS[workoutKeyFor(k)] || '#b9a8ff';
 
@@ -749,10 +750,9 @@ function renderPlan() {
     scheduleEditor() +
     '<h2>Workouts</h2>' + workoutList() +
     '<h2>Watch list <span class="h-note">how to do each exercise</span></h2>' + watchList() +
-    '<h2>Rules</h2><ul class="plain"><li>Every muscle is trained twice a week: chest Mon + Fri, back Tue + Thu, shoulders Mon + Thu, arms Mon, Tue + Fri, legs Wed + Sat, abs Mon, Wed + Fri.</li>' +
+    '<h2>Rules</h2><ul class="plain"><li>One muscle per day: chest Monday, back Tuesday, shoulders Wednesday, biceps Thursday, triceps Friday, legs Saturday, rest Sunday. Each gets one full session with enough sets to grow.</li>' +
     '<li>Effort in reps in reserve (RIR): heavy lifts stop 1 to 3 reps short of failure, isolation moves 0 to 2 short. Going to failure every set is not needed (ACSM 2026).</li>' +
     '<li>Log reps on each set. When every set reaches the top of the rep range, the app tells you to add the smallest weight jump.</li>' +
-    '<li>Supersets (A1 + A2): one set of each back to back, then rest. Saves time and keeps the heart rate up for fat burn.</li>' +
     '<li>Hit the top reps on every set, then add the smallest weight jump next time.</li>' +
     '<li>Never lock knees on leg press. Keep your back flat on every row and pulldown.</li>' +
     '<li>Every ' + DELOAD_EVERY + 'th week a deload is suggested: half the sets, same weights. You choose at the start of that week, or turn one on below any time.' + nextDeloadText() + '</li>' +
