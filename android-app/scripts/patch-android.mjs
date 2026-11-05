@@ -113,6 +113,23 @@ const gradle = path.join(root, 'android/app/build.gradle');
 let g = fs.readFileSync(gradle, 'utf8');
 const run = parseInt(process.env.GITHUB_RUN_NUMBER || '1', 10);
 g = g.replace(/versionCode\s+\d+/, 'versionCode ' + run).replace(/versionName\s+"[^"]*"/, 'versionName "1.' + run + '"');
+// Always sign with the key saved in android-app/signing, so every new APK installs over the last one.
+// (Without this, the build machine made a new random key each time and Android refused the update.)
+if (!g.includes('signingConfigs')) {
+  g = g.replace(/android\s*\{/, `android {
+    signingConfigs {
+        fixed {
+            storeFile file('../../signing/debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }`);
+  g = g.replace(/buildTypes\s*\{/, `buildTypes {
+        debug {
+            signingConfig signingConfigs.fixed
+        }`);
+}
 fs.writeFileSync(gradle, g);
 
 // App icon from the website icon (ImageMagick on the build machine).
