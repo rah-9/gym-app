@@ -39,7 +39,8 @@ export async function readSteps(days) {
   return out;
 }
 
-// Save a file: write it to the app cache, then open the share sheet (Save to Files, Drive, WhatsApp...).
+// Save a file straight into Download/FitTrack (shows in the Files app). Older phones, or if that fails,
+// get the share sheet instead (Save to Files, Drive, WhatsApp...). Returns where it went.
 export async function saveFile(name, blob) {
   const b64 = await new Promise((res, rej) => {
     const fr = new FileReader();
@@ -47,8 +48,13 @@ export async function saveFile(name, blob) {
     fr.onerror = rej;
     fr.readAsDataURL(blob);
   });
+  try {
+    const r = await call('FileSave', 'toDownloads', { name, data: b64, mime: blob.type || 'application/octet-stream' });
+    return { folder: r.folder || 'Download/FitTrack' };
+  } catch (e) { /* fall back to sharing */ }
   const w = await call('Filesystem', 'writeFile', { path: name, data: b64, directory: 'CACHE', recursive: true });
   await call('Share', 'share', { title: name, files: [w.uri], dialogTitle: 'Save or send ' + name });
+  return { shared: true };
 }
 
 /* ---------- activity from Health Connect: exercise minutes and active calories today ---------- */

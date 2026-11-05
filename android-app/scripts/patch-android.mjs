@@ -96,6 +96,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PhoneUsagePlugin.class);
         registerPlugin(FitNotifyPlugin.class);
         registerPlugin(AppUpdatePlugin.class);
+        registerPlugin(FileSavePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
