@@ -45,7 +45,10 @@ export function toast(msg) {
 export function download(name, text, type) {
   const blob = new Blob([text], { type: type || 'text/plain' });
   // In the Android app, files go through the share sheet (Save to Files, Drive, WhatsApp).
-  if (isNativeApp()) { saveFile(name, blob).catch(() => toast('Could not save the file.')); return; }
+  if (isNativeApp()) {
+    saveFile(name, blob).then((r) => { if (r && r.folder) toast('Saved to ' + r.folder + ' / ' + name); }, () => toast('Could not save the file.'));
+    return;
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
