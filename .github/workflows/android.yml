@@ -45,6 +45,12 @@ jobs:
           mkdir -p ~/.android && cp signing/debug.keystore ~/.android/debug.keystore
           cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon -q
           cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/gymlog.apk"
+      - name: Check the APK is signed with the saved key
+        run: |
+          APKSIGNER=$(ls -d ${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools/*/apksigner | tail -1)
+          "$APKSIGNER" verify --print-certs gymlog.apk | tee certs.txt
+          # SHA-256 of android-app/signing/debug.keystore. Updates only install when this never changes.
+          grep -qi "SHA-256 digest: 5255621d63eb1dc6efbdf44eba51b3efb658731c2475499eb0dda9d079dbe952" certs.txt || { echo "APK is not signed with the saved key"; exit 1; }
       - name: Publish to the "android" release
         # Test builds from other branches only check that the app compiles.
         if: github.ref == 'refs/heads/main'
