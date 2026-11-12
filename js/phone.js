@@ -4,7 +4,7 @@
    - Scheduled reminders for the next 2 days: water, steps, workout, wind-down, bedtime, wake up.
    On the website this module does nothing. */
 import { S, save } from './store.js';
-import { planFor, dayWrite, dayRead, dayStats, hasProgress, requiredItems, findEx, STEP_GOAL, stepGoalFor, WATER_GOAL } from './plan.js';
+import { planFor, dayWrite, dayRead, dayStats, hasProgress, requiredItems, findEx, isPick, pickGoal, STEP_GOAL, stepGoalFor, WATER_GOAL } from './plan.js';
 import { addDays, todayKey, fromKey } from './util.js';
 import * as native from './native.js';
 
@@ -100,8 +100,21 @@ export function waterGap(have, nowMs) {
 }
 
 /* ---------- state for the Android notification panel ---------- */
+function itemSnap(k, e, d) {
+  const sets = e.id !== 'warmup' ? Math.max(1, e.sets || 1) : 1;
+  const arr = (d.sets[e.id] || []).slice(0, sets).map(Boolean);
+  while (arr.length < sets) arr.push(false);
+  return { id: e.id, name: e.name, sets, set: arr, done: !!d.done[e.id], rest: sets > 1 ? e.rest || 0 : 0, reps: sets + ' x ' + e.reps };
+}
 function workoutSnap(k) {
   const p = planFor(k), d = dayRead(k);
+  if (isPick(p)) {
+    // Pick days: the panel shows the exercises you started, the one you touched last first,
+    // so "Set done" ticks what you are doing. The goal is the day's target count.
+    const started = p.exercises.filter((e) => d.done[e.id] || (d.sets[e.id] || []).some(Boolean));
+    started.sort((a, b) => (b.id === d.lastEx) - (a.id === d.lastEx));
+    return { title: p.short + ' day', goal: pickGoal(k), items: started.map((e) => itemSnap(k, e, d)) };
+  }
   return {
     title: p.short + ' day',
     items: requiredItems(k).map((it) => {

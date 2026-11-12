@@ -405,6 +405,172 @@ const LEGS_ONLY = {
   ]
 };
 
+/* ---------- Exercise library from 12 Nov 2026: pick your own ----------
+   Mon chest, Tue biceps, Wed triceps, Thu shoulders, Fri back, Sat legs, Sun rest.
+   Each day lists every good exercise for that muscle, grouped by area and ordered by priority
+   (main lifts first, then isolation, then alternatives). Tick any you do; the day is complete when
+   you reach your goal for the day (6, 7 or 8). Warm up and cardio do not count toward it.
+   Machines are the ones at the gym (Fitline): plate loaded flat chest press, pin stack chest press,
+   pec fly / rear delt, Smith rack with pull-up bar, adjustable bench, cable crossover and pulleys,
+   plate loaded front lat pulldown, plate loaded chest-supported row, biceps curl machine with preacher pad,
+   seated dip / triceps press, super squat, 45 degree leg press, leg extension / seated leg curl,
+   adductor / abductor, 45 degree back extension, dumbbells 2.5 kg and up, fixed straight and EZ barbells. */
+
+// L(group, id, name, machine, sets, reps, rest seconds, goal, main muscles, helper muscles, tip)
+function L(group, id, name, machine, sets, reps, rest, goal, main, also, tip) {
+  const q = (name.replace(/\(.*?\)/g, '') + ' proper form').trim().toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, '+');
+  return { id, name, machine, sets, reps, rest, tip, video: yt(q), google: 'https://www.google.com/search?q=how+to+do+' + q, bonus: 0, group, goal, main, also };
+}
+
+const CHEST_LIB = {
+  key: 'chestPick', pick: true, focus: 'Chest', short: 'Chest',
+  cardio: { name: 'Incline treadmill walk', detail: '20 min, incline 8 to 12, speed 4.5 to 5.5 km/h' },
+  exercises: [
+    L('Middle chest', 'flat-press', 'Flat chest press, plate loaded', 'Plate loaded chest press (flat bench, red arms)', 4, '8-10', 120, 'strength', ['Chest'], ['Front shoulders', 'Triceps'], 'Shoulder blades back and down, handles at mid chest. Main lift of the day.'),
+    L('Middle chest', 'bb-bench', 'Barbell bench press', 'Barbell + flat bench in the Smith rack (set the safety pins)', 4, '6-8', 150, 'strength', ['Chest'], ['Front shoulders', 'Triceps'], 'Bar to lower chest, feet flat, slight arch. Use a spotter or safety pins when heavy.'),
+    L('Upper chest', 'incline-smith', 'Incline Smith machine press', 'Smith machine + adjustable bench at 30 degrees', 4, '8-10', 120, 'strength', ['Upper chest'], ['Front shoulders', 'Triceps'], 'Bar to upper chest. 30 degrees hits the upper chest best.'),
+    L('Upper chest', 'incline-db', 'Incline dumbbell press', 'Adjustable bench at 30 degrees + dumbbells', 3, '8-10', 120, 'strength', ['Upper chest'], ['Front shoulders', 'Triceps'], 'Lower to chest level, press up and slightly in.'),
+    L('Middle chest', 'db-flat-press', 'Flat dumbbell press', 'Adjustable bench flat + dumbbells', 3, '8-10', 90, 'strength', ['Chest'], ['Front shoulders', 'Triceps'], 'Deep stretch at the bottom, do not clank the dumbbells at the top.'),
+    L('Middle chest', 'chest-press', 'Seated chest press machine', 'Chest press machine (pin stack)', 3, '10-12', 90, 'strength', ['Chest'], ['Front shoulders', 'Triceps'], 'Seat so handles are at mid chest. Smooth, full squeeze.'),
+    L('Upper chest', 'incline-bb', 'Incline barbell bench press', 'Barbell + adjustable bench at 30 degrees in the rack', 3, '6-8', 150, 'strength', ['Upper chest'], ['Front shoulders', 'Triceps'], 'Grip a little wider than shoulders, bar to upper chest.'),
+    L('Middle chest', 'smith-flat', 'Smith machine flat bench press', 'Smith machine + adjustable bench flat', 3, '8-10', 120, 'strength', ['Chest'], ['Front shoulders', 'Triceps'], 'Bench placed so the bar lands on the lower chest.'),
+    L('Middle chest', 'pec-fly', 'Pec fly machine', 'Pec Fly & Rear Delt machine (facing out)', 3, '12-15', 60, 'muscle', ['Chest'], ['Front shoulders'], 'Slight bend in elbows, squeeze 1 second in the middle.'),
+    L('Middle chest', 'cable-cross-mid', 'Cable crossover, chest height', 'Cable crossover, pulleys at shoulder height', 3, '12-15', 60, 'muscle', ['Chest'], ['Front shoulders'], 'Step forward, hug a big tree, hands meet in front of the chest.'),
+    L('Lower chest', 'cable-fly', 'High-to-low cable fly', 'Cable crossover, both pulleys high', 3, '12-15', 60, 'muscle', ['Lower chest'], ['Front shoulders'], 'Bring hands together at belly button level.'),
+    L('Upper chest', 'low-high-fly', 'Low-to-high cable fly', 'Cable crossover, both pulleys low', 3, '12-15', 60, 'muscle', ['Upper chest'], ['Front shoulders'], 'Scoop up to chin height, palms up.'),
+    L('Upper chest', 'incline-fly', 'Incline dumbbell fly', 'Adjustable bench at 30 degrees + dumbbells', 3, '12', 60, 'muscle', ['Upper chest'], ['Front shoulders'], 'Stretch wide, do not go too heavy.'),
+    L('Middle chest', 'db-fly', 'Flat dumbbell fly', 'Adjustable bench flat + dumbbells', 3, '12', 60, 'muscle', ['Chest'], ['Front shoulders'], 'Arms slightly bent, lower until you feel a stretch.'),
+    L('Lower chest', 'decline-bb', 'Decline barbell press', 'Barbell + adjustable bench on decline in the rack', 3, '8-10', 120, 'strength', ['Lower chest'], ['Triceps'], 'Feet locked in, bar to lower chest. Use the safety pins.'),
+    L('Lower chest', 'dips-chest', 'Chest dips, lean forward', 'Dip station', 3, '8-12', 90, 'strength', ['Lower chest'], ['Triceps', 'Front shoulders'], 'Lean forward, elbows out a little. Too hard? Do slow lowering only.'),
+    L('Overall chest', 'pushup', 'Push-ups', 'Floor (hands on a bench to make it easier)', 3, 'as many as clean', 60, 'muscle', ['Chest'], ['Triceps', 'Core'], 'Body in a straight line, chest to the floor.')
+  ]
+};
+
+const BICEPS_LIB = {
+  key: 'bicepsPick', pick: true, focus: 'Biceps', short: 'Biceps',
+  cardio: { name: 'Spin bike', detail: '15 min, steady pace' },
+  exercises: [
+    L('Biceps', 'bar-curl', 'Barbell curl', 'Fixed straight barbell from the rack', 4, '8-10', 90, 'strength', ['Biceps'], ['Forearms'], 'Elbows still at your sides, no leaning back.'),
+    L('Biceps', 'ez-curl', 'EZ-bar curl', 'Fixed EZ barbell from the rack', 3, '8-10', 90, 'strength', ['Biceps'], ['Forearms'], 'Easier on the wrists than a straight bar.'),
+    L('Biceps', 'curl-machine', 'Machine preacher curl', 'Biceps curl machine (plate loaded, preacher pad)', 3, '10-12', 60, 'muscle', ['Biceps'], ['Forearms'], 'Armpits on the top of the pad, full stretch at the bottom.'),
+    L('Biceps', 'db-curl', 'Alternating dumbbell curl', 'Dumbbells, standing', 3, '10-12 each arm', 60, 'muscle', ['Biceps'], ['Forearms'], 'Turn the palm up as you lift, squeeze at the top.'),
+    L('Biceps', 'incline-curl', 'Incline dumbbell curl', 'Adjustable bench at 45 degrees + dumbbells', 3, '10-12', 60, 'muscle', ['Biceps (long head)'], ['Forearms'], 'Arms hang straight down. The stretch grows the biceps.'),
+    L('Biceps', 'preacher-db', 'Single arm dumbbell preacher curl', 'Biceps curl machine preacher pad + one dumbbell', 3, '10-12 each arm', 60, 'muscle', ['Biceps (short head)'], ['Forearms'], 'Lower slowly, stop just before the elbow locks.'),
+    L('Biceps', 'ez-preacher', 'EZ-bar preacher curl', 'Biceps curl machine preacher pad + EZ barbell', 3, '10', 60, 'muscle', ['Biceps (short head)'], ['Forearms'], 'Keep the back of the arms on the pad the whole time.'),
+    L('Biceps', 'cable-curl', 'Cable curl, straight bar', 'Cable low pulley, straight bar', 3, '12', 60, 'muscle', ['Biceps'], ['Forearms'], 'Constant tension. Elbows by your sides.'),
+    L('Biceps', 'bayesian', 'Bayesian cable curl', 'Cable low pulley, D-handle, face away from the machine', 3, '12 each arm', 60, 'muscle', ['Biceps (long head)'], [], 'Arm behind the body for a big stretch, curl forward.'),
+    L('Biceps', 'concentration', 'Concentration curl', 'Flat bench + one dumbbell, seated', 3, '12 each arm', 45, 'muscle', ['Biceps'], [], 'Elbow on the inner thigh, slow on the way down.'),
+    L('Biceps', 'spider-curl', 'Spider curl', 'Adjustable bench at 45 degrees, chest on the pad + dumbbells', 3, '12', 45, 'muscle', ['Biceps (short head)'], [], 'Arms hang straight down in front of the bench.'),
+    L('Biceps', 'chinup', 'Chin-ups, palms facing you', 'Pull-up bar on the Smith rack', 3, 'as many as clean', 90, 'strength', ['Biceps', 'Lats'], ['Forearms'], 'Too hard? Jump up and lower slowly for 3 to 5 seconds.'),
+    L('Brachialis', 'hammer', 'Hammer curl', 'Dumbbells', 3, '10-12', 60, 'muscle', ['Brachialis (arm thickness)'], ['Forearms', 'Biceps'], 'Palms facing each other the whole time.'),
+    L('Brachialis', 'cross-hammer', 'Cross-body hammer curl', 'Dumbbells', 3, '12 each arm', 60, 'muscle', ['Brachialis (arm thickness)'], ['Forearms'], 'Curl across the body toward the opposite chest.'),
+    L('Brachialis', 'rope-hammer', 'Rope hammer curl', 'Cable low pulley, rope', 3, '12', 60, 'muscle', ['Brachialis (arm thickness)'], ['Forearms'], 'Neutral grip, pull the rope ends apart at the top.'),
+    L('Forearms', 'reverse-curl', 'Reverse grip EZ-bar curl', 'Fixed EZ barbell, palms down', 3, '12', 60, 'muscle', ['Forearms'], ['Brachialis (arm thickness)'], 'Light weight, wrists straight.')
+  ]
+};
+
+const TRICEPS_LIB = {
+  key: 'tricepsPick', pick: true, focus: 'Triceps', short: 'Tris',
+  cardio: { name: 'Incline treadmill walk', detail: '20 min, incline 8 to 12, speed 4.5 to 5.5 km/h' },
+  exercises: [
+    L('All three heads', 'tri-press', 'Seated dip machine (triceps press)', 'Triceps press / seated dip machine (plate loaded)', 4, '8-10', 90, 'strength', ['Triceps'], ['Lower chest'], 'Shoulders down, push until arms are straight. Main lift.'),
+    L('All three heads', 'close-grip', 'Close-grip bench press', 'Barbell or Smith machine + flat bench', 4, '8-10', 120, 'strength', ['Triceps'], ['Chest', 'Front shoulders'], 'Hands shoulder width, elbows close to the body.'),
+    L('All three heads', 'dips', 'Parallel bar dips, upright', 'Dip station', 3, '8-12', 90, 'strength', ['Triceps'], ['Chest', 'Front shoulders'], 'Body upright to keep it on the triceps. Too hard? Slow lowering only.'),
+    L('Long head', 'oh-ext', 'Seated overhead dumbbell extension', 'Adjustable bench upright + one dumbbell', 3, '10-12', 75, 'muscle', ['Triceps (long head)'], [], 'Elbows point up, lower behind the head for a deep stretch.'),
+    L('Long head', 'cable-oh-ext', 'Overhead cable extension, rope', 'Cable pulley low or mid, rope, face away', 3, '12', 60, 'muscle', ['Triceps (long head)'], [], 'Lean forward a little, elbows by your ears.'),
+    L('Long head', 'skull-ez', 'EZ-bar skull crusher', 'Fixed EZ barbell + flat bench', 3, '10', 75, 'muscle', ['Triceps (long head)'], [], 'Lower the bar behind the forehead, elbows stay pointing up.'),
+    L('Long head', 'incline-skull', 'Incline skull crusher', 'EZ barbell or dumbbells + adjustable bench at 30 degrees', 3, '10', 75, 'muscle', ['Triceps (long head)'], [], 'More stretch than the flat version.'),
+    L('Long head', 'lying-db-ext', 'Lying dumbbell extension', 'Flat bench + two dumbbells', 3, '12', 60, 'muscle', ['Triceps (long head)'], [], 'Palms facing each other, lower beside the head.'),
+    L('Lateral head', 'rope-pushdown', 'Rope pushdown', 'Cable pulley high, rope', 3, '12', 60, 'muscle', ['Triceps (lateral head)'], [], 'Split the rope apart at the bottom.'),
+    L('Lateral head', 'straight-bar', 'Straight bar pushdown', 'Cable pulley high, straight bar', 3, '12', 60, 'muscle', ['Triceps (lateral head)'], [], 'Squeeze 1 second at the bottom.'),
+    L('Lateral head', 'vbar', 'V-bar pushdown', 'Cable pulley high, V-bar', 3, '12', 60, 'muscle', ['Triceps (lateral head)'], [], 'Elbows pinned to your sides.'),
+    L('Lateral head', 'single-pushdown', 'Single arm cable pushdown', 'Cable pulley high, D-handle', 3, '12 each arm', 45, 'muscle', ['Triceps'], [], 'One arm at a time fixes a weaker side.'),
+    L('Medial head', 'reverse-pushdown', 'Reverse grip pushdown', 'Cable pulley high, straight bar or D-handle, palms up', 3, '12', 45, 'muscle', ['Triceps (medial head)'], [], 'Palms up, elbows pinned.'),
+    L('Medial head', 'kickback', 'Dumbbell kickback', 'Flat bench + one dumbbell', 3, '12 each arm', 45, 'muscle', ['Triceps'], [], 'Upper arm parallel to the floor, squeeze at the back.'),
+    L('Medial head', 'cable-kickback', 'Cable kickback', 'Cable low pulley, no handle or D-handle', 3, '12 each arm', 45, 'muscle', ['Triceps'], [], 'Constant tension through the whole move.'),
+    L('Bodyweight', 'diamond-pushup', 'Diamond push-ups', 'Floor (hands on a bench to make it easier)', 3, 'as many as clean', 60, 'muscle', ['Triceps'], ['Chest'], 'Hands together under the chest, elbows back.'),
+    L('Bodyweight', 'bench-dips', 'Bench dips', 'Flat bench, feet on the floor', 3, '12-15', 60, 'muscle', ['Triceps'], ['Front shoulders'], 'Stay close to the bench, go down to 90 degrees only.')
+  ]
+};
+
+const SHOULDERS_LIB = {
+  key: 'shouldersPick', pick: true, focus: 'Shoulders', short: 'Delts',
+  cardio: { name: 'Incline treadmill walk', detail: '20 min, incline 8 to 12, speed 4.5 to 5.5 km/h' },
+  exercises: [
+    L('Front delts', 'db-press', 'Seated dumbbell shoulder press', 'Adjustable bench upright + dumbbells', 4, '8-10', 120, 'strength', ['Front shoulders'], ['Side shoulders', 'Triceps'], 'Top pick for front delts in ACE tests. Do not lock elbows.'),
+    L('Front delts', 'machine-press', 'Machine shoulder press', 'Shoulder press machine', 3, '10', 90, 'strength', ['Front shoulders'], ['Side shoulders', 'Triceps'], 'Handles start at chin height.'),
+    L('Front delts', 'ohp', 'Standing barbell overhead press', 'Barbell from the Smith rack hooks', 4, '6-8', 150, 'strength', ['Front shoulders'], ['Side shoulders', 'Triceps', 'Core'], 'Squeeze glutes and abs, press the bar straight over the head.'),
+    L('Front delts', 'smith-ohp', 'Seated Smith shoulder press', 'Smith machine + adjustable bench upright', 3, '8-10', 120, 'strength', ['Front shoulders'], ['Triceps'], 'Bar comes down in front of the face to chin level.'),
+    L('Front delts', 'arnold', 'Arnold press', 'Adjustable bench upright + dumbbells', 3, '10', 90, 'strength', ['Front shoulders'], ['Side shoulders'], 'Start palms facing you, rotate out as you press.'),
+    L('Side delts', 'db-lateral', 'Dumbbell lateral raise', 'Dumbbells', 4, '12-15', 45, 'muscle', ['Side shoulders'], ['Traps'], 'Pinkies slightly up, stop at shoulder height.'),
+    L('Side delts', 'cable-lat', 'Single arm cable lateral raise', 'Cable low pulley, D-handle, cable crossing in front', 3, '12-15 each side', 45, 'muscle', ['Side shoulders'], [], 'Lead with the elbow. Constant tension.'),
+    L('Side delts', 'machine-lateral', 'Machine lateral raise', 'Lateral raise machine', 3, '12-15', 45, 'muscle', ['Side shoulders'], [], 'Pads on the outside of the elbows, slow down.'),
+    L('Side delts', 'upright-row', 'Wide grip upright row', 'EZ barbell or cable low pulley with straight bar', 3, '12', 60, 'muscle', ['Side shoulders'], ['Traps'], 'Hands wider than shoulders, pull to lower chest only.'),
+    L('Side delts', 'cable-y', 'Cable Y-raise', 'Cable crossover, both pulleys low, cross the cables', 3, '12', 45, 'muscle', ['Side shoulders'], ['Rear shoulders'], 'Raise the arms in a Y shape above the head, light weight.'),
+    L('Rear delts', 'rear-delt', 'Reverse pec deck', 'Pec Fly & Rear Delt machine (facing the pad)', 3, '15', 45, 'muscle', ['Rear shoulders'], ['Upper back'], 'Arms wide, pause at the back.'),
+    L('Rear delts', 'bent-rev-fly', 'Bent-over dumbbell reverse fly', 'Dumbbells (or chest on an incline bench)', 3, '15', 45, 'muscle', ['Rear shoulders'], ['Upper back'], 'Flat back, lift out to the sides with soft elbows.'),
+    L('Rear delts', 'face-pull', 'Cable face pull', 'Cable pulley at face height, rope', 3, '15', 60, 'muscle', ['Rear shoulders'], ['Upper back', 'Rotator cuff'], 'Pull to the forehead, elbows high. Keeps shoulders healthy.'),
+    L('Rear delts', 'cable-rear', 'Cable rear delt fly', 'Cable crossover, pulleys at shoulder height, cross the cables', 3, '15', 45, 'muscle', ['Rear shoulders'], [], 'Pull the arms back and wide, thumbs up.'),
+    L('Front delts', 'front-raise', 'Dumbbell front raise', 'Dumbbells (or one weight plate)', 3, '12', 60, 'muscle', ['Front shoulders'], [], 'Lift to eye level, no swinging.'),
+    L('Front delts', 'cable-front', 'Cable front raise', 'Cable low pulley, straight bar or D-handle', 3, '12', 60, 'muscle', ['Front shoulders'], [], 'Face away from the machine, lift to eye level.'),
+    L('Traps', 'shrug', 'Dumbbell shrug', 'Dumbbells', 3, '12-15', 60, 'muscle', ['Traps'], ['Forearms (grip)'], 'Straight up, hold 1 second at the top.'),
+    L('Traps', 'bb-shrug', 'Barbell shrug', 'Barbell from the Smith rack hooks (or the Smith bar)', 3, '12', 60, 'muscle', ['Traps'], ['Forearms (grip)'], 'No rolling, just up and down.'),
+    L('Rotator cuff', 'ext-rot', 'Cable external rotation', 'Cable pulley at elbow height, D-handle', 2, '15 each arm', 45, 'core', ['Rotator cuff'], ['Rear shoulders'], 'Elbow pinned to the side, rotate the hand out. Light and slow.')
+  ]
+};
+
+const BACK_LIB = {
+  key: 'backPick', pick: true, focus: 'Back', short: 'Back',
+  cardio: { name: 'Spin bike', detail: '15 min, steady pace' },
+  exercises: [
+    L('Lats (width)', 'front-lat', 'Front lat pulldown, plate loaded', 'Plate loaded front lat pulldown (knee pads)', 4, '8-10', 120, 'strength', ['Lats (back width)'], ['Biceps', 'Rear shoulders'], 'Chest up, pull elbows down to your ribs. Main lift.'),
+    L('Middle back (thickness)', 'seated-row', 'Chest-supported row, plate loaded', 'Plate loaded seated row (chest pad)', 4, '8-10', 120, 'strength', ['Mid back', 'Lats'], ['Rear shoulders', 'Biceps'], 'Chest on the pad, squeeze shoulder blades together 1 second.'),
+    L('Middle back (thickness)', 'bb-row', 'Barbell bent-over row', 'Barbell (fixed or loaded)', 4, '8-10', 120, 'strength', ['Mid back', 'Lats'], ['Lower back', 'Biceps'], 'Hinge to about 45 degrees, flat back, pull to the belly button.'),
+    L('Lats (width)', 'pullup', 'Pull-ups', 'Pull-up bar on the Smith rack', 3, 'as many as clean', 120, 'strength', ['Lats (back width)'], ['Biceps', 'Mid back'], 'Too hard? Jump up and lower slowly for 3 to 5 seconds.'),
+    L('Middle back (thickness)', 'db-row', 'One arm dumbbell row', 'Flat bench + dumbbell', 3, '8-10 each arm', 90, 'strength', ['Lats', 'Mid back'], ['Biceps', 'Rear shoulders'], 'Back flat, pull to the hip, big stretch at the bottom.'),
+    L('Lats (width)', 'wide-pull', 'Wide grip lat pulldown', 'Cable lat pulldown, long bar', 3, '10-12', 90, 'strength', ['Lats (back width)'], ['Biceps'], 'Hands just outside shoulders, pull to upper chest.'),
+    L('Lats (width)', 'close-pull', 'Close / neutral grip pulldown', 'Cable lat pulldown, V-handle or MAG grip', 3, '10-12', 90, 'strength', ['Lats'], ['Mid back', 'Biceps'], 'Lean back only a little, squeeze the lats.'),
+    L('Middle back (thickness)', 'cable-row', 'Seated cable row', 'Cable low pulley, V-handle, feet on the plate', 3, '10-12', 90, 'strength', ['Mid back', 'Lats'], ['Biceps'], 'Sit tall, pull to the belly, shoulder blades back.'),
+    L('Middle back (thickness)', 'incline-row', 'Chest supported incline dumbbell row', 'Adjustable bench at 45 degrees + dumbbells, chest on the pad', 3, '10-12', 75, 'strength', ['Mid back'], ['Rear shoulders'], 'Elbows out wide for the upper back, no lower back strain.'),
+    L('Middle back (thickness)', 'smith-row', 'Smith machine bent-over row', 'Smith machine', 3, '10', 90, 'strength', ['Mid back', 'Lats'], ['Biceps'], 'Same as the barbell row but the bar path is fixed.'),
+    L('Middle back (thickness)', 'underhand-row', 'Underhand barbell row', 'Barbell, palms up', 3, '10', 90, 'strength', ['Lats', 'Mid back'], ['Biceps'], 'Elbows close, pull to the lower belly.'),
+    L('Middle back (thickness)', 'single-cable-row', 'Single arm cable row', 'Cable low pulley, D-handle', 3, '12 each arm', 60, 'muscle', ['Lats'], ['Mid back'], 'Let the shoulder reach forward, then pull back to the hip.'),
+    L('Lats (width)', 'straight-arm', 'Straight arm pulldown', 'Cable pulley high, straight bar or rope', 3, '12-15', 60, 'muscle', ['Lats'], ['Triceps', 'Core'], 'Arms nearly straight, pull to thighs.'),
+    L('Lats (width)', 'db-pullover', 'Dumbbell pullover', 'Flat bench + one dumbbell', 3, '12', 60, 'muscle', ['Lats'], ['Chest'], 'Lower the dumbbell behind the head with soft elbows.'),
+    L('Lower back', 'back-ext', 'Back extension', '45 degree back extension bench (hold a plate to make it harder)', 3, '12, slow', 60, 'core', ['Lower back'], ['Glutes', 'Hamstrings'], 'Stop when your body is a straight line. No arching.'),
+    L('Lower back', 'rdl', 'Romanian deadlift', 'Barbell or dumbbells', 3, '8-10', 120, 'strength', ['Hamstrings (back thigh)', 'Lower back'], ['Glutes', 'Forearms (grip)'], 'Hips back, back flat, bar close to the legs. Skip it on a sore back day.'),
+    L('Lower back', 'deadlift', 'Conventional deadlift', 'Barbell + plates from the floor', 3, '5-6', 180, 'strength', ['Lower back', 'Glutes', 'Hamstrings'], ['Lats', 'Forearms (grip)'], 'Learn it light first. Bar over mid foot, chest up, push the floor away.')
+  ]
+};
+
+const LEGS_LIB = {
+  key: 'legsPick', pick: true, focus: 'Legs', short: 'Legs',
+  cardio: { name: 'Easy walk', detail: '10 min, flat' },
+  exercises: [
+    L('Quads (front thigh)', 'super-squat', 'Super squat', 'Super squat machine (red, shoulder pads)', 4, '8-10', 150, 'strength', ['Quads (front thigh)', 'Glutes'], ['Hamstrings', 'Core'], 'Deep as you can with a flat back, knees over toes. Main lift.'),
+    L('Quads (front thigh)', 'leg-press', 'Leg press', '45 degree leg press, feet middle of the plate', 4, '10-12', 120, 'strength', ['Quads (front thigh)', 'Glutes'], ['Hamstrings'], 'Go deep, never lock the knees.'),
+    L('Quads (front thigh)', 'bb-squat', 'Barbell back squat', 'Smith rack hooks + barbell (set the safety pins)', 4, '6-8', 180, 'strength', ['Quads (front thigh)', 'Glutes'], ['Hamstrings', 'Core', 'Lower back'], 'Bar on the upper back, sit down between the heels, chest up.'),
+    L('Quads (front thigh)', 'smith-squat', 'Smith machine squat', 'Smith machine', 3, '10', 120, 'strength', ['Quads (front thigh)', 'Glutes'], ['Hamstrings', 'Core'], 'Feet slightly forward of the bar.'),
+    L('Quads (front thigh)', 'leg-ext', 'Leg extension', 'Leg extension / leg curl machine', 3, '12-15', 60, 'muscle', ['Quads (front thigh)'], [], 'Pause 1 second at the top.'),
+    L('Quads (front thigh)', 'split-squat', 'Bulgarian split squat', 'Flat bench + dumbbells', 3, '8-10 each leg', 90, 'strength', ['Quads (front thigh)', 'Glutes'], ['Hamstrings', 'Core (balance)'], 'Back foot on the bench, front knee over the toes.'),
+    L('Quads (front thigh)', 'lunges', 'Walking lunges', 'Dumbbells (or bodyweight to start)', 3, '10 each leg', 90, 'strength', ['Quads', 'Glutes'], ['Hamstrings', 'Core (balance)'], 'Long steps, back knee close to the floor.'),
+    L('Quads (front thigh)', 'goblet-squat', 'Goblet squat', 'One dumbbell held at the chest', 3, '10-12', 90, 'strength', ['Quads (front thigh)', 'Glutes'], ['Core'], 'Elbows inside the knees at the bottom.'),
+    L('Quads (front thigh)', 'reverse-lunge', 'Dumbbell reverse lunge', 'Dumbbells', 3, '10 each leg', 75, 'strength', ['Quads', 'Glutes'], ['Hamstrings'], 'Step back, easier on the knees than forward lunges.'),
+    L('Quads (front thigh)', 'step-up', 'Step-ups', 'Step platform or flat bench + dumbbells', 3, '10 each leg', 75, 'strength', ['Quads', 'Glutes'], ['Calves'], 'Push through the heel of the top foot.'),
+    L('Hamstrings (back thigh)', 'leg-curl', 'Seated leg curl', 'Leg extension / leg curl machine, curl setting', 4, '10-12', 75, 'muscle', ['Hamstrings (back thigh)'], ['Calves'], 'Lean forward a little for more stretch. Slow on the way up.'),
+    L('Hamstrings (back thigh)', 'lying-leg-curl', 'Lying leg curl', 'Lying leg curl machine', 3, '10-12', 75, 'muscle', ['Hamstrings (back thigh)'], ['Calves'], 'Hips pressed into the pad.'),
+    L('Hamstrings (back thigh)', 'rdl', 'Romanian deadlift', 'Barbell or dumbbells', 3, '8-10', 120, 'strength', ['Hamstrings (back thigh)', 'Glutes'], ['Lower back', 'Forearms (grip)'], 'Hips back, back flat. Skip it on a sore back day.'),
+    L('Hamstrings (back thigh)', 'good-morning', 'Good morning', 'Light barbell on the upper back (or the Smith bar)', 3, '10', 90, 'strength', ['Hamstrings (back thigh)', 'Lower back'], ['Glutes'], 'Soft knees, push the hips back until you feel a stretch. Go light.'),
+    L('Glutes', 'hip-thrust', 'Hip thrust', 'Smith machine or barbell + flat bench, pad on the bar', 4, '8-10', 120, 'strength', ['Glutes'], ['Hamstrings'], 'Upper back on the bench, chin tucked, squeeze 1 second at the top.'),
+    L('Glutes', 'glute-bridge', 'Glute bridge', 'Floor + barbell or a dumbbell on the hips', 3, '12', 60, 'muscle', ['Glutes'], ['Hamstrings'], 'Push through the heels, ribs down.'),
+    L('Glutes', 'glute-kickback', 'Cable glute kickback', 'Cable low pulley, ankle strap', 3, '12 each leg', 45, 'muscle', ['Glutes'], [], 'Kick back and slightly out, do not arch the lower back.'),
+    L('Glutes', 'add-abd', 'Abductor, then adductor', 'Adductor / abductor machine', 3, '15 each', 45, 'muscle', ['Outer hips (glutes)', 'Inner thighs'], [], 'Slow, no bouncing. Lean forward on the abductor for upper glutes.'),
+    L('Calves', 'calf', 'Calf raise on the leg press', '45 degree leg press, balls of feet on the plate edge', 4, '12-15', 45, 'muscle', ['Calves'], [], 'Full stretch at the bottom, 1 second hold at the top.'),
+    L('Calves', 'seated-calf', 'Seated calf raise', 'Seated calf raise machine', 3, '15', 45, 'muscle', ['Calves'], [], 'Bent knees hit the lower calf (soleus).'),
+    L('Calves', 'smith-calf', 'Standing calf raise', 'Smith machine or dumbbells, toes on a plate or step', 3, '12-15', 45, 'muscle', ['Calves'], [], 'Straight knees, slow and full range.')
+  ]
+};
+
 /* What each exercise works and what it is for. Shown on every card.
    main: muscles doing most of the work. also: helpers. goal: a key from GOALS. */
 export const GOALS = {
@@ -495,13 +661,15 @@ const attach = (o, id) => Object.assign(o, TARGETS[id] || { main: [], also: [], 
 attach(WARMUP, 'warmup');
 [CHEST_ONLY, BACK_ONLY, SHOULDERS_ONLY, BICEPS_ONLY, TRICEPS_ONLY, LEGS_ONLY, ARMS, CHEST, BACK, LEGS, CHEST_DAY, SHOULDERS, ARMS_PLUS, LEG_DAY, PUSH_A, PULL_A, LEGS_A, SHOULDER_BACK, PUSH_B, LEGS_B].forEach((w) => { w.exercises.forEach((e) => attach(e, e.id)); attach(w.cardio, 'cardio'); });
 REST.tasks.forEach((t) => attach(t, t.id));
+[CHEST_LIB, BICEPS_LIB, TRICEPS_LIB, SHOULDERS_LIB, BACK_LIB, LEGS_LIB].forEach((w) => attach(w.cardio, 'cardio'));
 
 // Older workouts stay so days logged under them keep their history.
 // They are hidden from the day pickers unless a day already uses one.
-[CHEST_DAY, ARMS, BACK, SHOULDERS, ARMS_PLUS, LEG_DAY, CHEST, LEGS, PUSH_A, PULL_A, LEGS_A, SHOULDER_BACK, PUSH_B, LEGS_B].forEach((w) => { w.old = true; });
+[CHEST_DAY, ARMS, BACK, SHOULDERS, ARMS_PLUS, LEG_DAY, CHEST, LEGS, PUSH_A, PULL_A, LEGS_A, SHOULDER_BACK, PUSH_B, LEGS_B, CHEST_ONLY, BACK_ONLY, SHOULDERS_ONLY, BICEPS_ONLY, TRICEPS_ONLY, LEGS_ONLY].forEach((w) => { w.old = true; });
 
-// Every workout the schedule can use, by key. The one-muscle week comes first.
+// Every workout the schedule can use, by key. The pick-your-own week comes first.
 export const WORKOUTS = {
+  chestPick: CHEST_LIB, bicepsPick: BICEPS_LIB, tricepsPick: TRICEPS_LIB, shouldersPick: SHOULDERS_LIB, backPick: BACK_LIB, legsPick: LEGS_LIB,
   chestOnly: CHEST_ONLY, backOnly: BACK_ONLY, shouldersOnly: SHOULDERS_ONLY, bicepsOnly: BICEPS_ONLY, tricepsOnly: TRICEPS_ONLY, legsOnly: LEGS_ONLY,
   pushA: PUSH_A, pullA: PULL_A, legsA: LEGS_A, shoback: SHOULDER_BACK, chestarms: PUSH_B, legsB: LEGS_B,
   chest: CHEST_DAY, arms: ARMS, back: BACK, shoulders: SHOULDERS, armsplus: ARMS_PLUS, legday: LEG_DAY,
@@ -509,10 +677,13 @@ export const WORKOUTS = {
 };
 
 // Default week. Index matches Date.getDay(): 0 = Sunday.
-// One muscle per day: Mon chest, Tue back, Wed shoulders, Thu biceps, Fri triceps, Sat legs, Sun rest.
-export const SCHEDULE = ['rest', 'chestOnly', 'backOnly', 'shouldersOnly', 'bicepsOnly', 'tricepsOnly', 'legsOnly'];
+// One muscle per day, pick your own exercises: Mon chest, Tue biceps, Wed triceps, Thu shoulders, Fri back, Sat legs, Sun rest.
+export const SCHEDULE = ['rest', 'chestPick', 'bicepsPick', 'tricepsPick', 'shouldersPick', 'backPick', 'legsPick'];
 // Raised when the default week changes, so the app moves to it once (logged days keep their workout).
-export const PLAN_VERSION = 3;
+export const PLAN_VERSION = 4;
+// How many exercises finish a pick-your-own day, unless you choose another number that day.
+export const PICK_GOAL = 6;
+export const PICK_CHOICES = [6, 7, 8];
 
 // The week used before October 2026 (Mon/Thu arms, Tue/Fri chest).
 // Old saved days without a workout stamp are read with this, so history stays correct.

@@ -7,14 +7,11 @@ Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
 
 - PIN lock (4 digits). Opens as soon as the 4th digit is right, then stays open for 12 hours on that phone.
 - Today tab: the checklist for today's weekday. Every new day starts a fresh list.
-  - One muscle per day (from 5 Nov 2026):
-  - Monday: chest
-  - Tuesday: back
-  - Wednesday: shoulders
-  - Thursday: biceps
-  - Friday: triceps
-  - Saturday: legs
-  - Sunday: rest day (walk, weigh in, stretch)
+  - One muscle per day, pick your own exercises (from 12 Nov 2026):
+  - Monday: chest, Tuesday: biceps, Wednesday: triceps, Thursday: shoulders, Friday: back, Saturday: legs, Sunday: rest
+  - Each day lists every good exercise for that muscle (16 to 21), grouped by area (for example upper, middle and lower chest)
+    and ordered best first. Tick any you do; the day is complete at 6 exercises (pick 7 or 8 on the day card if you like).
+    Warm up and cardio do not count toward the goal. Each exercise names the machine at the gym and has YouTube and Google links.
   - Effort in reps in reserve (RIR): heavy lifts stop 1 to 3 reps short of failure, isolation moves 0 to 2 short.
   - Every 7th program week a deload (half the sets, same weights) is suggested. You choose yes or no at the start of that week, or turn one on any week from Plan.
   - Older workouts stay in the app for history and are hidden from the pickers.

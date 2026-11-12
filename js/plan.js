@@ -1,5 +1,5 @@
 /* Plan logic: which workout a day gets, what counts as done, streaks and last weights. */
-import { WORKOUTS, SCHEDULE, WARMUP, HABITS, MEALS, PROGRAM_START } from './data.js';
+import { WORKOUTS, SCHEDULE, WARMUP, HABITS, MEALS, PROGRAM_START, PICK_GOAL } from './data.js';
 import { S, dayHasProgress } from './store.js';
 import { addDays, todayKey, dow, fromKey, keyOf, MONTH_NAMES, weekStartOf } from './util.js';
 
@@ -118,9 +118,30 @@ export const EX_NAMES = (() => {
   return m;
 })();
 
+/* ---------- pick-your-own days ----------
+   The day lists every exercise for the muscle; you do any of them. The day is complete when
+   `pickGoal` exercises are ticked (6 by default, 7 or 8 if you choose). Warm up and cardio do not count. */
+export const isPick = (p) => !!(p && p.pick);
+export function pickGoal(k) {
+  const d = S.days[k];
+  const g = (d && d.goal) || S.settings.pickGoal || PICK_GOAL;
+  return Math.max(1, Math.min(20, parseInt(g, 10) || PICK_GOAL));
+}
+export function pickedDone(k) {
+  const p = planFor(k), d = dayRead(k);
+  return isPick(p) ? p.exercises.filter((e) => d.done[e.id]) : [];
+}
+
 export function requiredItems(k) {
   const p = planFor(k);
   if (p.rest) return p.tasks.map((t) => ({ id: t.id, name: t.name }));
+  if (isPick(p)) {
+    // The exercises you did, plus one line for the ones still to pick.
+    const done = pickedDone(k).map((e) => ({ id: e.id, name: e.name }));
+    const left = pickGoal(k) - done.length;
+    if (left > 0) done.push({ id: '', pick: true, name: left + ' more ' + p.focus.toLowerCase() + (left === 1 ? ' exercise' : ' exercises') + ', any you like' });
+    return done;
+  }
   const items = mainExercises(p).map((e) => ({ id: e.id, name: e.name }));
   items.push({ id: 'cardio', name: 'Cardio: ' + p.cardio.name });
   return items;
@@ -290,6 +311,7 @@ export function sessionMinutes(k) {
 // Main muscles a workout trains, short names, in order of first use.
 export function musclesFor(p) {
   if (p.rest) return [];
+  if (isPick(p)) return Array.from(new Set(p.exercises.map((e) => e.group.replace(/\s*\(.*\)/, ''))));
   const seen = new Set();
   mainExercises(p).forEach((e) => (e.main || []).forEach((m) => {
     const short = m.replace(/\s*\(.*\)/, '');
@@ -301,14 +323,18 @@ export function musclesFor(p) {
 /* ---------- stats ---------- */
 export function dayStats(k) {
   const d = dayRead(k), p = planFor(k), req = requiredItems(k);
-  let done = 0;
+  let done = 0, total = req.length;
   const missed = [];
-  req.forEach((it) => { if (d.done[it.id]) done++; else missed.push(it.name); });
+  if (isPick(p)) {
+    total = pickGoal(k);
+    done = Math.min(total, pickedDone(k).length);
+    req.forEach((it) => { if (it.pick) missed.push(it.name); });
+  } else req.forEach((it) => { if (d.done[it.id]) done++; else missed.push(it.name); });
   let sets = 0;
   Object.keys(d.sets).forEach((id) => { (d.sets[id] || []).forEach((v) => { if (v) sets++; }); });
   const bonusDone = p.rest ? 0 : bonusExercises(p).filter((e) => d.done[e.id]).length;
   return {
-    total: req.length, done, pct: req.length ? Math.round(done / req.length * 100) : 0,
+    total, done, pct: total ? Math.round(done / total * 100) : 0,
     missed, sets, bonusDone,
     habitsDone: HABITS.filter((h) => d.habits[h.id]).length, habitsTotal: HABITS.length,
     mealsDone: MEALS.filter((m) => d.meals[m.id]).length, mealsTotal: MEALS.length,
