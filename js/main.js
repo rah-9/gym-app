@@ -227,6 +227,7 @@ function syncPanel() {
 function toggleDone(id) {
   const d = dayWrite(ui.selDate);
   d.done[id] = !d.done[id];
+  if (id !== 'warmup' && id !== 'cardio') d.lastEx = id;
   stamp(d, d.done[id]);
   const e = findEx(ui.selDate, id);
   if (e && e.sets > 1) {
@@ -246,6 +247,7 @@ function toggleSet(id, i) {
   while (arr.length < ex.sets) arr.push(false);
   arr[i] = !arr[i];
   d.sets[id] = arr;
+  if (id !== 'warmup') d.lastEx = id;
   stamp(d, arr[i]);
   const all = arr.every(Boolean);
   d.done[id] = all;
@@ -447,6 +449,13 @@ const ACTIONS = {
   'diet-toggle': (el) => { S.settings.dietOpen = !el.parentElement.open; save(); },
   'notify-on': notifyOn,
   'notify-later': () => { S.settings.notifyAsked = true; save(); render(); toast('You can turn them on later in the Plan tab.'); },
+  'pick-goal': (el) => {
+    const n = +el.dataset.v, d = dayWrite(ui.selDate);
+    d.goal = n;
+    S.settings.pickGoal = n; // also the default for the next days
+    save(); render(); pushProgress();
+    toast('Goal: any ' + n + ' exercises today.');
+  },
   'app-check': () => checkForUpdate(true),
   'app-update': installUpdate,
   'app-later': () => { if (ui.update && ui.update.latest) { S.settings.updLater = ui.update.latest.versionCode; save(); render(); } },

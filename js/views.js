@@ -1,10 +1,10 @@
 /* Screens: Today, Report and Plan. Each returns an HTML string; render() puts it on the page. */
-import { WORKOUTS, WARMUP, HABITS, MEALS, GOALS } from './data.js';
+import { WORKOUTS, WARMUP, HABITS, MEALS, GOALS, PICK_CHOICES } from './data.js';
 import { S } from './store.js';
 import {
   planFor, workoutKeyFor, schedule, dayRead, dayStats, dayStatus, hasProgress, mainExercises, bonusExercises,
   weightHint, musclesFor, nextUp, programWeek, counts, stepsPct, STEP_GOAL, STATUS_LABEL, WEEK_ORDER,
-  streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, deadlineText, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek, stepGoalFor, treatDays, badges, kgHistory, makeupFor, makeupTicked, isMissedWorkout, missedWeek, MISSED_POINTS, MAKEUP_PER_DAY, makeupQueue, repTop, isDeload, dayMode, DELOAD_EVERY, deloadSuggested, deloadChoice
+  isPick, pickGoal, pickedDone, streak, monthStats, notesForDay, nextSameWorkout, sessionMinutes, bestKg, requiredItems, EX_NAMES, bodyStats, deadlineText, WATER_GOAL, TREATS, treatInfo, treatPoints, ptsLabel, walkMinutes, treatsOn, balanceFor, balanceDone, penaltyWeek, stepGoalFor, treatDays, badges, kgHistory, makeupFor, makeupTicked, isMissedWorkout, missedWeek, MISSED_POINTS, MAKEUP_PER_DAY, makeupQueue, repTop, isDeload, dayMode, DELOAD_EVERY, deloadSuggested, deloadChoice
 } from './plan.js';
 import { weekVolume, CHECK_FIELDS, checkOf, checkComplete, lighterReasons, weekCheck, strengthTrend, dayE1rm, dayActive, weekActive, FOODS, foodInfo, dayProtein, proteinTarget, weekProtein, calorieTarget, latestWeight, ACTIVITY, PROTEIN_PER_KG } from './track.js';
 import { reportData, bestLabel } from './report.js';
@@ -117,7 +117,10 @@ function exerciseCard(e, d, isBonus, isNext) {
       ? '<span class="hint stay"><b>Stay at ' + last.kg + ' kg</b><small>' + (last.byReps ? 'last time ' + last.reps.join('/') + ' reps, get ' + last.top + ' on every set first' : 'last time ' + last.setsDone + ' of ' + last.planned + ' sets, finish them all first') + '</small></span>'
       : '<span class="hint up"><b>&#8593; Go up to ' + last.next + ' kg</b><small>' + (last.status === 'push' ? 'same ' + last.kg + ' kg 3 times, time to push' : last.byReps ? 'last time ' + last.reps.join('/') + ' reps, top of the range on every set' : 'last time ' + last.kg + ' kg, all sets done') + '</small></span>';
   } else if (last) lastNote = '<span class="hint"><small>last time ' + last.kg + ' kg' + (last.best && last.best !== last.kg ? ', best ' + last.best : '') + '</small></span>';
-  const watch = e.video ? '<a class="watch" href="' + esc(e.video) + '" target="_blank" rel="noopener" aria-label="Watch how to do ' + esc(e.name) + '">How to <span aria-hidden="true">&#8599;</span></a>' : '';
+  // Tutorials: YouTube video search, and a Google search for written guides and pictures.
+  const gq = e.google || (e.id !== 'warmup' ? 'https://www.google.com/search?q=how+to+do+' + encodeURIComponent(e.name + ' proper form') : '');
+  const watch = (e.video ? '<a class="watch" href="' + esc(e.video) + '" target="_blank" rel="noopener" aria-label="YouTube videos for ' + esc(e.name) + '">YouTube <span aria-hidden="true">&#8599;</span></a>' : '') +
+    (gq ? '<a class="watch" href="' + esc(gq) + '" target="_blank" rel="noopener" aria-label="Google guides for ' + esc(e.name) + '">Google <span aria-hidden="true">&#8599;</span></a>' : '');
   const logs = hasKg && e.id !== 'warmup' ? setLogs(e, d, sets, last) : '';
   const tools = ((!done || open) && (dots || kgField || watch)
     ? '<div class="tools">' + (dots ? '<div class="dots">' + dots + '</div>' : '') + kgField + lastNote + watch + '</div>' : '') + logs;
@@ -257,6 +260,26 @@ function reminderHtml() {
     '<button type="button" class="quiet" data-action="dismiss">Got it</button></div></div>';
 }
 
+/* Pick-your-own day: warm up, the goal picker, then every exercise grouped by area
+   (best first in each group). Tick any you do; warm up and cardio do not count. */
+function pickList(k, p, d) {
+  const goal = pickGoal(k), got = pickedDone(k).length, left = Math.max(0, goal - got);
+  const seg = (n) => '<button type="button" class="seg' + (goal === n ? ' on' : '') + '" data-action="pick-goal" data-v="' + n + '">' + n + '</button>';
+  let h = '<h2>Warm up <span class="h-note">does not count toward the goal</span></h2><ul class="list">' + exerciseCard(WARMUP, d, false, false) + '</ul>';
+  h += '<div class="card pickbar' + (left ? '' : ' complete') + '"><div class="pick-text"><b>' + (left ? 'Pick any ' + goal + ' exercises' : goal + ' done. Workout complete') + '</b>' +
+    '<span class="muted small">' + got + ' of ' + goal + ' done' + (left ? ', ' + left + ' to go' : '') + '. Use what is free at the gym, skip what is not there.</span></div>' +
+    '<div class="pick-goal"><span class="muted small">Goal</span><span class="segs">' + PICK_CHOICES.map(seg).join('') + '</span></div></div>';
+  const groups = [];
+  p.exercises.forEach((e) => { if (!groups.includes(e.group)) groups.push(e.group); });
+  groups.forEach((g) => {
+    const list = p.exercises.filter((e) => e.group === g);
+    const n = list.filter((e) => d.done[e.id]).length;
+    h += '<h3 class="grp">' + esc(g) + ' <span class="h-note">' + list.length + (list.length === 1 ? ' exercise' : ' exercises') + (n ? ', ' + n + ' done' : '') + '</span></h3>' +
+      '<ul class="list">' + list.map((e) => exerciseCard(e, d, false, false)).join('') + '</ul>';
+  });
+  return h;
+}
+
 function renderToday() {
   const k = ui.selDate, p = planFor(k), d = dayRead(k), today = todayKey();
   let body = '';
@@ -270,10 +293,13 @@ function renderToday() {
       body += '<div class="memo"><span class="memo-h">Note from ' + DAY_SHORT[dow(ln.k)] + ' ' + fmt(ln.k) + ' (' + esc(planFor(ln.k).short) + ')</span><p>' + esc(ln.note) + '</p></div>';
     });
     body += makeupCard(k) + balanceCard(k);
-    body += '<h2>Workout <span class="h-note">top to bottom, tap a name for tips</span></h2><ul class="list">' +
-      mainExercises(p).map((e) => exerciseCard(e, d, false, e.id === nextId)).join('') + '</ul>';
-    body += '<h2>Bonus <span class="h-note">if your body allows today</span></h2>' +
-      '<ul class="list">' + bonusExercises(p).map((e) => exerciseCard(e, d, true, false)).join('') + '</ul>';
+    if (isPick(p)) body += pickList(k, p, d);
+    else {
+      body += '<h2>Workout <span class="h-note">top to bottom, tap a name for tips</span></h2><ul class="list">' +
+        mainExercises(p).map((e) => exerciseCard(e, d, false, e.id === nextId)).join('') + '</ul>';
+      body += '<h2>Bonus <span class="h-note">if your body allows today</span></h2>' +
+        '<ul class="list">' + bonusExercises(p).map((e) => exerciseCard(e, d, true, false)).join('') + '</ul>';
+    }
     body += '<h2>Cardio</h2><ul class="list">' + simpleCard('done', 'cardio', !!d.done.cardio, p.cardio.name, p.cardio.detail, p.cardio) + '</ul>';
   }
 
@@ -699,11 +725,15 @@ function workoutList() {
     if (!days.length) return '';
     const list = p.rest
       ? p.tasks.map((t) => '<li>' + esc(t.name) + ' <span class="muted">' + esc(t.detail) + '</span></li>').join('')
+      : isPick(p)
+      ? p.exercises.map((e) => '<li><span class="plan-grp">' + esc(e.group) + '</span> ' + esc(e.name) + ' <span class="muted">' + e.sets + ' x ' + esc(e.reps) + '</span>' +
+          '<span class="plan-works">' + esc(e.machine) + '</span></li>').join('') +
+        '<li>Cardio: ' + esc(p.cardio.name) + ' <span class="muted">' + esc(p.cardio.detail) + '</span></li>'
       : mainExercises(p).map((e) => '<li>' + esc(e.name) + ' <span class="muted">' + (e.id === WARMUP.id ? esc(e.reps) : e.sets + ' x ' + esc(e.reps)) + '</span>' +
           (e.id !== WARMUP.id && e.main.length ? '<span class="plan-works">' + e.main.map(esc).join(', ') + '</span>' : '') + '</li>').join('') +
         bonusExercises(p).map((e) => '<li class="b">Bonus ' + e.bonus + ': ' + esc(e.name) + ' <span class="muted">' + e.sets + ' x ' + esc(e.reps) + '</span></li>').join('') +
         '<li>Cardio: ' + esc(p.cardio.name) + ' <span class="muted">' + esc(p.cardio.detail) + '</span></li>';
-    return '<details class="plan-day"' + (p.key === todayW ? ' open' : '') + '><summary><b>' + esc(p.focus) + '</b> <span class="muted">' + days.join(', ') + '</span></summary><ol>' + list + '</ol></details>';
+    return '<details class="plan-day"' + (p.key === todayW ? ' open' : '') + '><summary><b>' + esc(p.focus) + '</b> <span class="muted">' + days.join(', ') + (isPick(p) ? ' &middot; pick any ' + pickGoal(todayKey()) + ' of ' + p.exercises.length : '') + '</span></summary><ol>' + list + '</ol></details>';
   }).join('');
 }
 
@@ -750,7 +780,7 @@ function renderPlan() {
     scheduleEditor() +
     '<h2>Workouts</h2>' + workoutList() +
     '<h2>Watch list <span class="h-note">how to do each exercise</span></h2>' + watchList() +
-    '<h2>Rules</h2><ul class="plain"><li>One muscle per day: chest Monday, back Tuesday, shoulders Wednesday, biceps Thursday, triceps Friday, legs Saturday, rest Sunday. Each gets one full session with enough sets to grow.</li>' +
+    '<h2>Rules</h2><ul class="plain"><li>One muscle per day: chest Monday, biceps Tuesday, triceps Wednesday, shoulders Thursday, back Friday, legs Saturday, rest Sunday.</li><li>Each day lists every good exercise for that muscle, best first in each group. Pick any 6 (or 7 or 8, your choice on the day) and finish them. Warm up and cardio do not count toward the goal. Try to cover each group, for example upper and middle chest.</li><li>About 10 or more hard sets per muscle a week builds muscle (ACSM 2026). 6 exercises of 3 to 4 sets gives about 20.</li>' +
     '<li>Effort in reps in reserve (RIR): heavy lifts stop 1 to 3 reps short of failure, isolation moves 0 to 2 short. Going to failure every set is not needed (ACSM 2026).</li>' +
     '<li>Log reps on each set. When every set reaches the top of the rep range, the app tells you to add the smallest weight jump.</li>' +
     '<li>Hit the top reps on every set, then add the smallest weight jump next time.</li>' +

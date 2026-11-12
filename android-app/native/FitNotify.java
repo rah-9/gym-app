@@ -300,6 +300,22 @@ public class FitNotify {
         for (int i = 0; i < total; i++) if (itemDone(items.optJSONObject(i))) done++;
         JSONObject cur = current(w);
         String head = w.optString("title", "Workout");
+        // Pick-your-own days: progress counts toward the day's goal (6, 7 or 8 exercises).
+        int goal = w.optInt("goal", 0);
+        if (goal > 0) {
+            total = goal;
+            done = Math.min(done, goal);
+            if (done >= goal) cur = null;
+            else if (cur == null) {
+                NotificationCompat.Builder b = builder(c, alert ? CH_REMIND : CH_WORKOUT, ID_WORKOUT, head + " · " + done + " of " + goal + " done",
+                    (goal - done) + " to go. Open the app and pick your next exercise.")
+                    .setOnlyAlertOnce(!alert).setAutoCancel(false).setProgress(goal, done, false);
+                if (resting) b.setUsesChronometer(true).setChronometerCountDown(true).setWhen(restEnd).setShowWhen(true).setSubText("Resting");
+                if (today().equals(prefs(c).getString("undoDay", ""))) b.addAction(0, "Undo", action(c, A_UNDO, 9203, null, 0));
+                post(c, ID_WORKOUT, b.build());
+                return;
+            }
+        }
 
         if (cur == null) {
             if (prefs(c).getString("doneShown", "").equals(today())) { cancel(c, ID_WORKOUT); return; }
