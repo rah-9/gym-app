@@ -26,10 +26,13 @@ public class SummaryReceiver extends BroadcastReceiver {
     public void onReceive(Context ctx, Intent intent) {
         String action = intent.getAction() == null ? "" : intent.getAction();
         if (action.equals(Intent.ACTION_BOOT_COMPLETED) || action.equals("android.intent.action.MY_PACKAGE_REPLACED")) {
+            try { PhoneUsagePlugin.storeRecent(ctx, 7); } catch (Exception ignored) { }
             PhoneUsagePlugin.scheduleAll(ctx);
             return;
         }
         String kind = intent.getStringExtra("kind");
+        // Save the last 3 days of sleep and screen time on the phone, even if the app is not opened.
+        try { PhoneUsagePlugin.storeRecent(ctx, 3); } catch (Exception ignored) { }
         try {
             if (PhoneUsagePlugin.hasUsageAccess(ctx)) {
                 long day = PhoneUsagePlugin.todayStart();

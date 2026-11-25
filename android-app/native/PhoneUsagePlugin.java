@@ -104,6 +104,53 @@ public class PhoneUsagePlugin extends Plugin {
         }).start();
     }
 
+    /** Days saved in the background (morning and evening alarms), for the app to copy into its data. */
+    @PluginMethod
+    public void stored(PluginCall call) {
+        try {
+            JSObject r = new JSObject();
+            r.put("days", new JSObject(getContext().getSharedPreferences(DAILY, Context.MODE_PRIVATE).getString("days", "{}")));
+            call.resolve(r);
+        } catch (Exception e) {
+            call.reject("Read failed: " + e.getMessage());
+        }
+    }
+
+    static final String DAILY = "fittrack_daily";
+    static final int DAILY_KEEP = 400;
+
+    /**
+     * Save the last `days` days of sleep and screen time on the phone, without the app being open.
+     * Runs from the morning and evening alarms. A finished day is not computed again. The app copies
+     * these into its own data the next time it opens, so nothing is lost even after weeks without opening
+     * it (Android itself only keeps about a week of its phone-use log). Keeps the newest 400 days here.
+     */
+    static void storeRecent(Context ctx, int days) {
+        if (!hasUsageAccess(ctx)) return;
+        SharedPreferences p = ctx.getSharedPreferences(DAILY, Context.MODE_PRIVATE);
+        org.json.JSONObject all;
+        try { all = new org.json.JSONObject(p.getString("days", "{}")); } catch (Exception e) { all = new org.json.JSONObject(); }
+        java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
+        long today = todayStart();
+        for (int i = 0; i < days; i++) {
+            Calendar c = Calendar.getInstance();
+            c.setTimeInMillis(today);
+            c.add(Calendar.DAY_OF_MONTH, -i);
+            String key = f.format(c.getTime());
+            org.json.JSONObject old = all.optJSONObject(key);
+            if (old != null && old.optBoolean("final")) continue;
+            try { all.put(key, summarize(ctx, c.getTimeInMillis(), true)); } catch (Exception ignored) { }
+        }
+        if (all.length() > DAILY_KEEP) {
+            List<String> keys = new ArrayList<>();
+            java.util.Iterator<String> it = all.keys();
+            while (it.hasNext()) keys.add(it.next());
+            Collections.sort(keys);
+            for (int i = 0; i < keys.size() - DAILY_KEEP; i++) all.remove(keys.get(i));
+        }
+        p.edit().putString("days", all.toString()).apply();
+    }
+
     /** Planned wake-up and bedtime (minutes after midnight), used when the phone cannot see the sleep. */
     static void saveTimes(Context ctx, PluginCall call) {
         Integer w = call.getInt("wakeMin"), b = call.getInt("bedMin");
