@@ -69,11 +69,48 @@ public class PhoneUsagePlugin extends Plugin {
         Context ctx = getContext();
         if (!hasUsageAccess(ctx)) { call.reject("NO_ACCESS"); return; }
         long dayStart = call.getLong("dayStart", todayStart());
+        saveTimes(ctx, call);
         try {
             call.resolve(summarize(ctx, dayStart, true));
         } catch (Exception e) {
             call.reject("Usage read failed: " + e.getMessage());
         }
+    }
+
+    /** One summary per day for the last `days` days (today included, newest first). Android keeps
+        usage events for roughly a week to ten days, so older days come back empty. */
+    @PluginMethod
+    public void history(PluginCall call) {
+        Context ctx = getContext();
+        if (!hasUsageAccess(ctx)) { call.reject("NO_ACCESS"); return; }
+        int days = Math.max(1, Math.min(14, call.getInt("days", 10)));
+        saveTimes(ctx, call);
+        new Thread(() -> {
+            try {
+                JSArray out = new JSArray();
+                long today = todayStart();
+                for (int i = 0; i < days; i++) {
+                    Calendar c = Calendar.getInstance();
+                    c.setTimeInMillis(today);
+                    c.add(Calendar.DAY_OF_MONTH, -i);
+                    out.put(summarize(ctx, c.getTimeInMillis(), true));
+                }
+                JSObject r = new JSObject();
+                r.put("days", out);
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject("Usage read failed: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    /** Planned wake-up and bedtime (minutes after midnight), used when the phone cannot see the sleep. */
+    static void saveTimes(Context ctx, PluginCall call) {
+        Integer w = call.getInt("wakeMin"), b = call.getInt("bedMin");
+        SharedPreferences.Editor e = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit();
+        if (w != null) e.putInt("wakeMin", w);
+        if (b != null) e.putInt("bedMin", b);
+        e.apply();
     }
 
     /** Daily notifications: morning sleep summary and evening screen-time summary. */
@@ -157,52 +194,139 @@ public class PhoneUsagePlugin extends Plugin {
         return g;
     }
 
-    static JSObject summarize(Context ctx, long dayStart, boolean withApps) {
-        long now = System.currentTimeMillis();
-        long dayEnd = Math.min(now, dayStart + 24 * HOUR);
-        long from = dayStart - 6 * HOUR;
-        List<long[]> on = screenOn(ctx, from, dayEnd);
-        JSObject r = new JSObject();
-        long screen = overlap(on, dayStart, dayEnd);
-        r.put("dayStart", dayStart);
-        r.put("until", dayEnd);
-        r.put("screenMs", screen);
-        r.put("freeMs", Math.max(0, dayEnd - dayStart - screen));
-        r.put("unlocks", unlocks(ctx, dayStart, dayEnd));
-
-        // Sleep: longest off-screen stretch of 3 h or more between 8 PM yesterday and 1 PM today.
-        long sa = dayStart - 4 * HOUR, sb = Math.min(dayEnd, dayStart + 13 * HOUR);
+    /** Longest finished off-screen stretch of 3 h or more in [a, b]: a night's sleep. */
+    static long[] sleepIn(List<long[]> on, long a, long b, long now) {
         long[] best = null;
-        for (long[] g : gaps(on, sa, sb)) if (g[1] - g[0] >= 3 * HOUR && (best == null || g[1] - g[0] > best[1] - best[0])) best = g;
-        if (best != null && best[1] < now - 10 * MIN) {
-            r.put("sleepStart", best[0]); r.put("sleepEnd", best[1]); r.put("sleepMs", best[1] - best[0]);
+        if (b <= a) return null;
+        for (long[] g : gaps(on, a, b)) if (g[1] - g[0] >= 3 * HOUR && g[1] < now - 10 * MIN && (best == null || g[1] - g[0] > best[1] - best[0])) best = g;
+        return best;
+    }
+
+    /** Home-screen apps, left out of screen time the way Digital Wellbeing does. */
+    static java.util.Set<String> launchers(Context ctx) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        try {
+            Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+            for (android.content.pm.ResolveInfo ri : ctx.getPackageManager().queryIntentActivities(home, 0)) out.add(ri.activityInfo.packageName);
+        } catch (Exception ignored) { }
+        out.add("com.android.systemui");
+        return out;
+    }
+
+    /** Time each app was open on screen in [from, to] (foreground events, closed when the screen turns off). */
+    static Map<String, List<long[]>> appUse(Context ctx, long from, long to) {
+        Map<String, List<long[]>> use = new java.util.HashMap<>();
+        UsageStatsManager um = (UsageStatsManager) ctx.getSystemService(Context.USAGE_STATS_SERVICE);
+        UsageEvents ev = um.queryEvents(from, to);
+        UsageEvents.Event e = new UsageEvents.Event();
+        Map<String, Long> open = new java.util.HashMap<>();
+        java.util.Set<String> skip = launchers(ctx);
+        while (ev.hasNextEvent()) {
+            ev.getNextEvent(e);
+            int t = e.getEventType();
+            String pkg = e.getPackageName();
+            long ts = e.getTimeStamp();
+            if (t == 1) { // MOVE_TO_FOREGROUND / ACTIVITY_RESUMED
+                if (pkg == null || skip.contains(pkg) || pkg.contains("launcher")) continue;
+                for (String o : new ArrayList<>(open.keySet())) { if (!o.equals(pkg)) addUse(use, o, open.remove(o), ts); }
+                if (!open.containsKey(pkg)) open.put(pkg, ts);
+            } else if (t == 2 || t == 23) { // MOVE_TO_BACKGROUND / ACTIVITY_PAUSED / ACTIVITY_STOPPED
+                Long st = open.remove(pkg);
+                if (st != null) addUse(use, pkg, st, ts);
+            } else if (Build.VERSION.SDK_INT >= 28 && (t == UsageEvents.Event.SCREEN_NON_INTERACTIVE || t == UsageEvents.Event.KEYGUARD_SHOWN)) {
+                for (String o : new ArrayList<>(open.keySet())) addUse(use, o, open.remove(o), ts);
+            }
         }
-        // Longest phone-free stretch while awake today.
-        long awakeFrom = best != null ? best[1] : dayStart;
+        for (String o : open.keySet()) addUse(use, o, open.get(o), to);
+        return use;
+    }
+
+    static void addUse(Map<String, List<long[]>> use, String pkg, long a, long b) {
+        if (b <= a) return;
+        List<long[]> l = use.get(pkg);
+        if (l == null) { l = new ArrayList<>(); use.put(pkg, l); }
+        l.add(new long[]{a, b});
+    }
+
+    /** Merge overlapping intervals so two apps on screen at once are not counted twice. */
+    static List<long[]> union(Map<String, List<long[]>> use) {
+        List<long[]> all = new ArrayList<>();
+        for (List<long[]> l : use.values()) all.addAll(l);
+        Collections.sort(all, (x, y) -> Long.compare(x[0], y[0]));
+        List<long[]> out = new ArrayList<>();
+        for (long[] x : all) {
+            if (!out.isEmpty() && x[0] <= out.get(out.size() - 1)[1]) out.get(out.size() - 1)[1] = Math.max(out.get(out.size() - 1)[1], x[1]);
+            else out.add(new long[]{x[0], x[1]});
+        }
+        return out;
+    }
+
+    /**
+     * One day, counted from when you woke up to when you went to sleep (the night does not count):
+     *  - sleep: last night's sleep, the longest screen-off stretch (3 h+) from 8 PM to 1 PM;
+     *  - awake window: that wake-up (or the planned wake time) until tonight's sleep (or the planned
+     *    bedtime for a past day, or now for today);
+     *  - screen time: time apps were open on screen in the awake window, like Digital Wellbeing
+     *    (home screen left out);
+     *  - phone-free: the awake window minus screen time; late: phone use after the planned bedtime.
+     */
+    static JSObject summarize(Context ctx, long dayStart, boolean withApps) {
+        SharedPreferences p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        int wakeMin = p.getInt("wakeMin", 390), bedMin = p.getInt("bedMin", 1380);
+        long now = System.currentTimeMillis();
+        boolean isToday = dayStart == todayStart();
+        long from = dayStart - 6 * HOUR, to = Math.min(now, dayStart + 38 * HOUR);
+        List<long[]> on = screenOn(ctx, from, to);
+        long[] sleep = sleepIn(on, dayStart - 4 * HOUR, Math.min(to, dayStart + 13 * HOUR), now);
+        long awakeFrom = sleep != null ? sleep[1] : dayStart + wakeMin * MIN;
+        long plannedBed = dayStart + (bedMin <= wakeMin ? bedMin + 1440 : bedMin) * MIN;
+        long[] next = sleepIn(on, Math.max(awakeFrom + HOUR, dayStart + 18 * HOUR), Math.min(to, dayStart + 37 * HOUR), now);
+        long awakeTo = next != null ? next[0] : (isToday ? now : plannedBed);
+        awakeTo = Math.min(awakeTo, now);
+        if (awakeTo < awakeFrom) awakeTo = awakeFrom;
+
+        Map<String, List<long[]>> use = appUse(ctx, from, to);
+        List<long[]> merged = union(use);
+        long screen = overlap(merged, awakeFrom, awakeTo);
+        long late = awakeTo > plannedBed ? overlap(merged, plannedBed, awakeTo) : 0;
+
+        JSObject r = new JSObject();
+        r.put("v", 2);
+        r.put("dayStart", dayStart);
+        r.put("until", awakeTo);
+        r.put("awakeFrom", awakeFrom);
+        r.put("awakeTo", awakeTo);
+        r.put("awakeMs", awakeTo - awakeFrom);
+        r.put("wakeSrc", sleep != null ? "phone" : "plan");
+        r.put("screenMs", screen);
+        r.put("freeMs", Math.max(0, awakeTo - awakeFrom - screen));
+        r.put("lateMs", late);
+        r.put("unlocks", unlocks(ctx, awakeFrom, awakeTo));
+        r.put("final", !isToday && (next != null || now > plannedBed + 6 * HOUR));
+        if (sleep != null) { r.put("sleepStart", sleep[0]); r.put("sleepEnd", sleep[1]); r.put("sleepMs", sleep[1] - sleep[0]); }
+
+        // Longest phone-free stretch while awake.
         long longest = 0, ls = 0;
-        for (long[] g : gaps(on, awakeFrom, dayEnd)) if (g[1] - g[0] > longest) { longest = g[1] - g[0]; ls = g[0]; }
+        for (long[] g : gaps(on, awakeFrom, awakeTo)) if (g[1] - g[0] > longest) { longest = g[1] - g[0]; ls = g[0]; }
         r.put("longestFreeMs", longest);
         r.put("longestFreeStart", ls);
 
         if (withApps) {
+            List<Object[]> tot = new ArrayList<>();
+            for (Map.Entry<String, List<long[]>> en : use.entrySet()) {
+                long ms = overlap(en.getValue(), awakeFrom, awakeTo);
+                if (ms >= MIN) tot.add(new Object[]{en.getKey(), ms});
+            }
+            Collections.sort(tot, (x, y) -> Long.compare((Long) y[1], (Long) x[1]));
             JSArray apps = new JSArray();
-            try {
-                UsageStatsManager um = (UsageStatsManager) ctx.getSystemService(Context.USAGE_STATS_SERVICE);
-                Map<String, UsageStats> m = um.queryAndAggregateUsageStats(dayStart, dayEnd);
-                List<UsageStats> list = new ArrayList<>(m.values());
-                Collections.sort(list, (x, y) -> Long.compare(y.getTotalTimeInForeground(), x.getTotalTimeInForeground()));
-                PackageManager pm = ctx.getPackageManager();
-                int n = 0;
-                for (UsageStats u : list) {
-                    if (n >= 6 || u.getTotalTimeInForeground() < MIN) break;
-                    String label = u.getPackageName();
-                    try { ApplicationInfo ai = pm.getApplicationInfo(u.getPackageName(), 0); label = String.valueOf(pm.getApplicationLabel(ai)); } catch (Exception ignored) { }
-                    if (u.getPackageName().contains("launcher")) continue;
-                    JSObject a = new JSObject();
-                    a.put("name", label); a.put("ms", u.getTotalTimeInForeground());
-                    apps.put(a); n++;
-                }
-            } catch (Exception ignored) { }
+            PackageManager pm = ctx.getPackageManager();
+            for (int i = 0; i < Math.min(6, tot.size()); i++) {
+                String pkg = (String) tot.get(i)[0], label = pkg;
+                try { ApplicationInfo ai = pm.getApplicationInfo(pkg, 0); label = String.valueOf(pm.getApplicationLabel(ai)); } catch (Exception ignored) { }
+                JSObject a1 = new JSObject();
+                a1.put("name", label); a1.put("ms", (Long) tot.get(i)[1]);
+                apps.put(a1);
+            }
             r.put("apps", apps);
         }
         return r;

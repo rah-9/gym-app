@@ -86,7 +86,7 @@ h3 { font-weight: 600; font-size: 15px; margin: 18px 0 8px; color: var(--ink-2);
   padding: 16px max(16px, env(safe-area-inset-right, 0px)) calc(120px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
 }
 .tabs {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;
   background: var(--bg); border-top: 1px solid var(--line);
   padding: 8px max(12px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
 }
@@ -1089,3 +1089,23 @@ button.cal-cell:active { transform: scale(0.94); }
 h3.grp { margin: 22px 0 8px; font-size: 15px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .plan-grp { display: inline-block; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-right: 4px; }
 .tools .watch + .watch { margin-left: 4px; }
+
+/* ---------- Sleep & screen tab ---------- */
+.sv-top { display: flex; justify-content: center; margin: -6px 0 6px; }
+.chart { margin: 14px 0 6px; padding: 12px 12px 8px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+.chart figcaption { font-size: 13px; font-weight: 600; color: var(--ink-2, var(--ink)); margin-bottom: 6px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .bar { fill: #9b7ff7; }
+.chart .hit { fill: transparent; }
+.chart .hit:hover + .bar, .chart .bar:hover { fill: #b9a8ff; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .axis { fill: var(--muted); font-size: 9px; font-family: inherit; }
+.chart .band { fill: rgba(155, 127, 247, 0.12); }
+.chart .target { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.chart-note { font-size: 12px; color: var(--muted); margin-top: 6px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.key { display: inline-block; width: 14px; height: 8px; border-radius: 2px; vertical-align: middle; }
+.key.band { background: rgba(155, 127, 247, 0.3); }
+.key.line { height: 0; border-top: 2px dashed var(--muted); }
+.plain.apps li, .plain.insights li { margin-bottom: 4px; }
+.plain.apps li { display: flex; justify-content: space-between; gap: 10px; list-style: none; margin-left: -18px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.tabs button { font-size: 13px; padding-left: 2px; padding-right: 2px; }

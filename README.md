@@ -17,6 +17,15 @@ Plain HTML, CSS and JavaScript. No build step, no backend, no accounts.
   - Older workouts stay in the app for history and are hidden from the pickers.
   - Change any day in Plan > Your week. Before you tick anything, you can also switch a single day's workout from the Today card.
     Days you already logged keep the workout they were logged under, so changing the week never rewrites history.
+- Sleep tab (sleep and screen time), Week / Month with arrows:
+  - Sleep for every day (the night that ended that morning): from the phone (Android app, Usage access) or the daily check-in.
+    Goal 7 to 9 hours (AASM + Sleep Research Society, National Sleep Foundation), your sleep schedule as the target.
+    Shows average, nights in range, short nights, sleep debt, usual bedtime and wake-up and how much they vary, with a chart.
+  - Screen time counts only the awake part of the day, from wake-up to sleep (the night does not count), as time apps were
+    open on screen like Digital Wellbeing (home screen left out). Phone-free = awake time minus screen time. Also phone use
+    after bedtime, unlocks, top apps, with a chart.
+  - Day-by-day table, plain-language notes, and PDF, Word or text downloads for the week or the month.
+  - The app reads about 10 days back each time it syncs, so open it at least once a week to keep every day.
 - Each exercise card shows what it works (main muscles, helper muscles) and a goal tag:
   Strength + muscle, Muscle growth, Core strength, Fat burn, Warm up or Recovery. The Plan tab explains each tag.
 - The Today card lists the muscles the day trains.

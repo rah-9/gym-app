@@ -5,7 +5,7 @@
    On the website this module does nothing. */
 import { S, save } from './store.js';
 import { planFor, dayWrite, dayRead, dayStats, hasProgress, requiredItems, findEx, isPick, pickGoal, STEP_GOAL, stepGoalFor, WATER_GOAL } from './plan.js';
-import { addDays, todayKey, fromKey } from './util.js';
+import { addDays, todayKey, fromKey, keyOf } from './util.js';
 import * as native from './native.js';
 
 export const SLEEP_DEFAULT = { on: true, bed: '23:00', wake: '06:30' };
@@ -46,16 +46,25 @@ export async function syncAll(ui, ask, done) {
     }
     st.usage = await native.usageAllowed();
     if (st.usage) {
-      const midnight = fromKey(today).getTime();
-      const s = await native.usageSummary(midnight);
+      // Sleep and screen time for the last 10 days, so every day has a record even if the app was not opened.
+      const sp0 = sleepPlan(), [w0h, w0m] = hm(sp0.wake), [b0h, b0m] = hm(sp0.bed);
+      const times = { wakeMin: w0h * 60 + w0m, bedMin: b0h * 60 + b0m };
+      let list = [];
+      try { list = await native.usageHistory(10, times); }
+      catch (e) { list = [await native.usageSummary(fromKey(today).getTime(), times)]; } // older app build
+      list.forEach((s1) => {
+        if (!s1 || s1.dayStart == null) return;
+        const k = keyOf(new Date(s1.dayStart));
+        const old = (S.days[k] || {}).phone;
+        if (old && old.final && old.v === 2) return; // a finished day does not change any more
+        if (!S.days[k] && !s1.screenMs && !s1.sleepMs) return;
+        const d = dayWrite(k);
+        d.phone = { v: s1.v || 1, screenMs: s1.screenMs, freeMs: s1.freeMs, awakeMs: s1.awakeMs || 0, awakeFrom: s1.awakeFrom || 0, awakeTo: s1.awakeTo || 0,
+          wakeSrc: s1.wakeSrc || '', lateMs: s1.lateMs || 0, unlocks: s1.unlocks, longestFreeMs: s1.longestFreeMs,
+          sleepMs: s1.sleepMs || 0, sleepStart: s1.sleepStart || 0, sleepEnd: s1.sleepEnd || 0, apps: s1.apps || [], final: !!s1.final, at: Date.now() };
+      });
+      const s = (S.days[today] || {}).phone || {};
       const d = dayWrite(today);
-      d.phone = { screenMs: s.screenMs, freeMs: s.freeMs, unlocks: s.unlocks, longestFreeMs: s.longestFreeMs, sleepMs: s.sleepMs || 0, sleepStart: s.sleepStart || 0, sleepEnd: s.sleepEnd || 0, apps: s.apps || [], at: Date.now() };
-      // Yesterday's final screen time, for the report.
-      const y = addDays(today, -1);
-      if (S.days[y] && !(S.days[y].phone && S.days[y].phone.final)) {
-        const ys = await native.usageSummary(fromKey(y).getTime());
-        S.days[y].phone = Object.assign({}, S.days[y].phone, { screenMs: ys.screenMs, freeMs: ys.freeMs, unlocks: ys.unlocks, longestFreeMs: ys.longestFreeMs, final: true });
-      }
       // Fill the check-in sleep from the phone if you have not picked it.
       if (s.sleepMs) {
         d.check = Object.assign({}, d.check);
