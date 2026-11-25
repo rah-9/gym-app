@@ -53,6 +53,10 @@ export async function syncAll(ui, ask, done) {
       let list = [];
       try { list = await native.usageHistory(14, times); }
       catch (e) { list = [await native.usageSummary(fromKey(today).getTime(), times)]; } // older app build
+      // Days the phone saved in the background while the app was closed (older ones first, fresh reads win).
+      const saved = await native.usageStored();
+      const fresh = new Set(list.map((x) => x && x.dayStart));
+      list = Object.values(saved).filter((x) => x && !fresh.has(x.dayStart)).concat(list);
       list.forEach((s1) => {
         if (!s1 || s1.dayStart == null) return;
         const k = keyOf(new Date(s1.dayStart));

@@ -89,7 +89,7 @@ export function renderSleep() {
   h += '<h2>Day by day</h2>' + (rows ? '<div class="tablewrap"><table><thead><tr><th>Day</th><th>Sleep (night before)</th><th class="num">Screen</th><th class="num">Phone-free</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<p class="muted">Nothing recorded yet.</p>');
 
   h += '<div class="actions"><button type="button" class="primary" data-action="sv-pdf">Download PDF</button><button type="button" class="ghost" data-action="sv-doc">Download Word</button><button type="button" class="ghost" data-action="sv-copy">Copy text</button></div>' +
-    '<p class="muted small">Sleep is the night that ended that morning, worked out from when the screen stayed off for 3 hours or more. Screen time is the time apps were open, from wake-up to sleep, like Digital Wellbeing; the night does not count. Every day the app reads is saved on this phone for good (in the backup file too). Android itself only keeps about a week of its phone-use log, so open the app at least once a week so no day is missed.</p>';
+    '<p class="muted small">Sleep is the night that ended that morning, worked out from when the screen stayed off for 3 hours or more. Screen time is the time apps were open, from wake-up to sleep, like Digital Wellbeing; the night does not count. Every day is saved on this phone for good (in the backup file too). FitTrack saves each day by itself every morning and evening, even when you do not open it, so no day is missed.</p>';
   return h;
 }
 
