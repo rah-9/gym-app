@@ -46,11 +46,12 @@ export async function syncAll(ui, ask, done) {
     }
     st.usage = await native.usageAllowed();
     if (st.usage) {
-      // Sleep and screen time for the last 10 days, so every day has a record even if the app was not opened.
+      // Sleep and screen time for the last 14 days (as far back as Android keeps its phone-use log, about a week on
+      // most phones). Each day is saved in the app's own data and never deleted, so weeks and months add up for years.
       const sp0 = sleepPlan(), [w0h, w0m] = hm(sp0.wake), [b0h, b0m] = hm(sp0.bed);
       const times = { wakeMin: w0h * 60 + w0m, bedMin: b0h * 60 + b0m };
       let list = [];
-      try { list = await native.usageHistory(10, times); }
+      try { list = await native.usageHistory(14, times); }
       catch (e) { list = [await native.usageSummary(fromKey(today).getTime(), times)]; } // older app build
       list.forEach((s1) => {
         if (!s1 || s1.dayStart == null) return;

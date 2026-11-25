@@ -36,7 +36,7 @@ const CHEST = {
   exercises: [
     ex('pec-fly', 'Pec fly, facing out', 'Pec Fly & Rear Delt machine', 3, '12', 60, 'Slight bend in elbows, squeeze in the middle.', 'pec+deck+fly+machine+form'),
     ex('incline-smith', 'Incline press (compulsory)', 'Smith machine + bench at 30 to 45 degrees', 3, '10', 120, 'Bar to upper chest. 30 to 45 degrees hits the upper chest best.', 'smith+machine+incline+bench+press+form'),
-    ex('flat-press', 'Flat chest press', 'Plate loaded chest press (flat bench, red arms)', 3, '8-10', 120, 'Handles at mid chest, feet flat.', 'plate+loaded+iso+lateral+bench+press'),
+    ex('flat-press', 'Iso-Lateral Horizontal Bench Press', 'Fitline Iso-Lateral Horizontal Bench Press (plate loaded, flat bench, red arms)', 3, '8-10', 120, 'Handles at mid chest, feet flat.', 'plate+loaded+iso+lateral+bench+press'),
     ex('chest-press', 'Seated chest press', 'Chest press machine (pin stack)', 3, '10-12', 90, 'Smooth and controlled.', 'seated+chest+press+machine+form'),
     ex('db-press', 'Shoulder press', 'Bench upright + dumbbells', 3, '10', 90, 'Do not lock elbows at the top.', 'seated+dumbbell+shoulder+press+form'),
     ex('cable-lat', 'Single arm cable lateral raise', 'Cable low pulley, D-handle, cable crossing in front', 3, '12 each side', 45, 'Lead with the elbow, stop at shoulder height.', 'single+arm+cable+lateral+raise'),
@@ -107,7 +107,7 @@ const CHEST_DAY = {
   cardio: { name: 'Spin bike', detail: '15 min, steady pace' },
   exercises: [
     ex('pec-fly', 'Pec fly, facing out', 'Pec Fly & Rear Delt machine', 3, '12', 60, 'Slight bend in elbows, squeeze in the middle. Warms up the chest.', 'pec+deck+fly+machine+form'),
-    ex('flat-press', 'Flat chest press', 'Plate loaded chest press (flat bench, red arms)', 4, '8-10', 120, 'Handles at mid chest, feet flat, shoulder blades back.', 'plate+loaded+iso+lateral+bench+press'),
+    ex('flat-press', 'Iso-Lateral Horizontal Bench Press', 'Fitline Iso-Lateral Horizontal Bench Press (plate loaded, flat bench, red arms)', 4, '8-10', 120, 'Handles at mid chest, feet flat, shoulder blades back.', 'plate+loaded+iso+lateral+bench+press'),
     ex('incline-smith', 'Incline press', 'Smith machine + bench at 30 to 45 degrees', 3, '10', 120, 'Bar to upper chest. Builds the upper chest.', 'smith+machine+incline+bench+press+form'),
     ex('db-flat-press', 'Flat dumbbell press', 'Flat bench + dumbbells', 3, '10', 90, 'Lower slowly to chest level, press up and slightly in.', 'flat+dumbbell+bench+press+form'),
     ex('chest-press', 'Seated chest press', 'Chest press machine (pin stack)', 3, '10-12', 90, 'Smooth and controlled, full squeeze.', 'seated+chest+press+machine+form'),
@@ -194,7 +194,7 @@ const PUSH_A = {
   short: 'Chest',
   cardio: { name: 'Incline treadmill walk', detail: '20 min, incline 8 to 12, speed 4.5 to 5.5 km/h' },
   exercises: [
-    ex('flat-press', 'Flat chest press, heavy', 'Plate loaded chest press (flat bench, red arms)', 4, '6-8', 150, 'Main lift, stop 1 to 3 reps short of failure. Add weight when you hit 8 on all sets. Shoulder blades back.', 'plate+loaded+iso+lateral+bench+press'),
+    ex('flat-press', 'Iso-Lateral Horizontal Bench Press, heavy', 'Fitline Iso-Lateral Horizontal Bench Press (plate loaded, flat bench, red arms)', 4, '6-8', 150, 'Main lift, stop 1 to 3 reps short of failure. Add weight when you hit 8 on all sets. Shoulder blades back.', 'plate+loaded+iso+lateral+bench+press'),
     ex('incline-smith', 'Incline press', 'Smith machine + bench at 30 degrees', 3, '8-10', 120, 'Bar to upper chest, 30 degrees hits the upper chest best.', 'smith+machine+incline+bench+press+form'),
     ex('cable-fly', 'Cable crossover, high to low', 'Cable crossover, both pulleys high', 3, '12-15', 60, 'Big stretch, hands meet at belly button level.', 'cable+crossover+high+to+low+form'),
     ex('db-lateral', 'Dumbbell lateral raise', 'Dumbbells', 3, '12-15', 45, 'Pinkies slightly up, stop at shoulder height. Last set close to failure.', 'dumbbell+lateral+raise+form'),
@@ -311,7 +311,7 @@ const CHEST_ONLY = {
   short: 'Chest',
   cardio: { name: 'Incline treadmill walk', detail: '20 min, incline 8 to 12, speed 4.5 to 5.5 km/h' },
   exercises: [
-    ex('flat-press', 'Flat chest press, heavy', 'Plate loaded chest press (flat bench, red arms)', 4, '6-10', 150, 'Main lift. Shoulder blades back, handles at mid chest. Add weight when you hit 10 on all sets.', 'plate+loaded+iso+lateral+bench+press'),
+    ex('flat-press', 'Iso-Lateral Horizontal Bench Press, heavy', 'Fitline Iso-Lateral Horizontal Bench Press (plate loaded, flat bench, red arms)', 4, '6-10', 150, 'Main lift. Shoulder blades back, handles at mid chest. Add weight when you hit 10 on all sets.', 'plate+loaded+iso+lateral+bench+press'),
     ex('incline-smith', 'Incline press', 'Smith machine + bench at 30 degrees', 3, '8-10', 120, 'Bar to upper chest. 30 degrees hits the upper chest best.', 'smith+machine+incline+bench+press+form'),
     ex('db-flat-press', 'Flat dumbbell press', 'Flat bench + dumbbells', 3, '10', 90, 'Lower slowly to chest level, press up and slightly in.', 'flat+dumbbell+bench+press+form'),
     ex('chest-press', 'Seated chest press', 'Chest press machine (pin stack)', 3, '10-12', 90, 'Smooth and controlled, full squeeze.', 'seated+chest+press+machine+form'),
@@ -426,7 +426,7 @@ const CHEST_LIB = {
   key: 'chestPick', pick: true, focus: 'Chest', short: 'Chest',
   cardio: { name: 'Incline treadmill walk', detail: '20 min, incline 8 to 12, speed 4.5 to 5.5 km/h' },
   exercises: [
-    L('Middle chest', 'flat-press', 'Flat chest press, plate loaded', 'Plate loaded chest press (flat bench, red arms)', 4, '8-10', 120, 'strength', ['Chest'], ['Front shoulders', 'Triceps'], 'Shoulder blades back and down, handles at mid chest. Main lift of the day.'),
+    L('Middle chest', 'flat-press', 'Iso-Lateral Horizontal Bench Press', 'Fitline Iso-Lateral Horizontal Bench Press (plate loaded, flat bench, red arms)', 4, '8-10', 120, 'strength', ['Chest'], ['Front shoulders', 'Triceps'], 'Seat so the handles line up with mid chest, shoulder blades back and down, feet flat. Each arm moves on its own, so the weaker side cannot cheat; you can also press one arm at a time. Main lift of the day.'),
     L('Middle chest', 'bb-bench', 'Barbell bench press', 'Barbell + flat bench in the Smith rack (set the safety pins)', 4, '6-8', 150, 'strength', ['Chest'], ['Front shoulders', 'Triceps'], 'Bar to lower chest, feet flat, slight arch. Use a spotter or safety pins when heavy.'),
     L('Upper chest', 'incline-smith', 'Incline Smith machine press', 'Smith machine + adjustable bench at 30 degrees', 4, '8-10', 120, 'strength', ['Upper chest'], ['Front shoulders', 'Triceps'], 'Bar to upper chest. 30 degrees hits the upper chest best.'),
     L('Upper chest', 'incline-db', 'Incline dumbbell press', 'Adjustable bench at 30 degrees + dumbbells', 3, '8-10', 120, 'strength', ['Upper chest'], ['Front shoulders', 'Triceps'], 'Lower to chest level, press up and slightly in.'),
