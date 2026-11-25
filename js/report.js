@@ -294,7 +294,7 @@ export function docReport(r) {
 }
 
 let pdfLoading = null;
-function loadJsPdf() {
+export function loadJsPdf() {
   if (window.jspdf) return Promise.resolve();
   if (pdfLoading) return pdfLoading;
   pdfLoading = new Promise(function (res, rej) {

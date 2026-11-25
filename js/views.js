@@ -12,6 +12,7 @@ import * as notify from './notify.js';
 import { isNativeApp } from './native.js';
 import { journalHtml } from './journal.js';
 import { sleepPlan, clock12, sleepHoursPlanned, hrs, timeOf } from './phone.js';
+import { renderSleep } from './sleepview.js';
 import { $, esc, fmt, keyOf, fromKey, addDays, todayKey, weekStartOf, weekDays, dow, num, restLabel, clockTime, DAY_NAMES, DAY_SHORT } from './util.js';
 
 export const ui = { view: 'today', selDate: todayKey(), reportWs: weekStartOf(todayKey()), open: {} };
@@ -54,7 +55,7 @@ function greeting() {
 export function render() {
   document.documentElement.style.setProperty('--day', dayColor(ui.selDate));
   const v = $('#view');
-  v.innerHTML = ui.view === 'report' ? renderReport() : ui.view === 'plan' ? renderPlan() : ui.view === 'journal' ? journalHtml() : renderToday();
+  v.innerHTML = ui.view === 'report' ? renderReport() : ui.view === 'sleep' ? renderSleep() : ui.view === 'plan' ? renderPlan() : ui.view === 'journal' ? journalHtml() : renderToday();
   document.querySelectorAll('.tabs button').forEach((b) => {
     b.classList.toggle('on', b.dataset.view === ui.view);
     b.setAttribute('aria-current', b.dataset.view === ui.view ? 'page' : 'false');
@@ -1003,7 +1004,7 @@ function phoneCard(k) {
     : '<div class="pc-sleep"><span class="muted small">No clear sleep stretch found yet for last night.</span></div>';
   const apps = (p.apps || []).slice(0, 5);
   return '<div class="card phonecard"><div class="steps-top"><span class="name">Phone and sleep</span><span class="muted small">updated ' + timeOf(p.at) + '</span></div>' + sleepLine +
-    '<div class="pc-grid"><div><b>' + hrs(p.screenMs) + '</b><span>screen time</span></div><div><b>' + hrs(p.freeMs) + '</b><span>phone-free</span></div>' +
+    '<div class="pc-grid"><div><b>' + hrs(p.screenMs) + '</b><span>screen time' + (p.v === 2 ? ' since wake-up' : '') + '</span></div><div><b>' + hrs(p.freeMs) + '</b><span>phone-free' + (p.v === 2 ? ' while awake' : '') + '</span></div>' +
     '<div><b>' + (p.unlocks || 0) + '</b><span>unlocks</span></div><div><b>' + hrs(p.longestFreeMs) + '</b><span>longest break</span></div></div>' +
     (apps.length ? '<details class="fold"><summary>Top apps today</summary><ul class="food-log pc-apps">' + apps.map((a) => '<li><span>' + esc(a.name) + '</span><b>' + hrs(a.ms) + '</b></li>').join('') + '</ul></details>' : '') +
     '<p class="muted small">Sleep is estimated from the longest screen-off stretch overnight (about 25 min off on average in research), so check it against how you feel.' + (sp.on ? ' Planned: ' + clock12(sp.bed) + ' to ' + clock12(sp.wake) + '.' : '') + '</p></div>';

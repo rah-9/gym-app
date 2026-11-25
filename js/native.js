@@ -83,7 +83,9 @@ export async function readActivity() {
 export async function usageAllowed() { try { return !!(await call('PhoneUsage', 'hasAccess')).granted; } catch (e) { return false; } }
 export const openUsageSettings = () => call('PhoneUsage', 'openAccessSettings');
 export const openAppInfo = () => call('PhoneUsage', 'openAppInfo');
-export async function usageSummary(dayStartMs) { return call('PhoneUsage', 'summary', { dayStart: dayStartMs }); }
+export async function usageSummary(dayStartMs, times) { return call('PhoneUsage', 'summary', Object.assign({ dayStart: dayStartMs }, times || {})); }
+// Last `days` days of sleep and screen time (newest first), counted from wake-up to sleep.
+export async function usageHistory(days, times) { return ((await call('PhoneUsage', 'history', Object.assign({ days }, times || {}))) || {}).days || []; }
 export const scheduleSummaries = (o) => call('PhoneUsage', 'scheduleSummaries', o).catch(() => {});
 
 /* ---------- scheduled reminders (Android delivers them even when the app is closed) ---------- */

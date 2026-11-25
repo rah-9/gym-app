@@ -1,7 +1,8 @@
 /* App start-up and all tap/typing handlers. */
 import { S, save, backupNow, checkBackupSchedule, autoRestore, restoreLatest, importBackup, exportBackup, wipeAll, requestPersistentStorage } from './store.js';
 import { setDeload, isDeload, planFor, dayWrite, dayStats, nextUp, findEx, hasProgress, setScheduleDay, resetSchedule, STEP_GOAL, stepsPct, streak, monthStats, bestKg, sessionMinutes, EX_NAMES, WATER_GOAL, noteTarget, treatInfo, treatPoints, ptsLabel, balanceFor, stepGoalFor, treatDays } from './plan.js';
-import { reportData, reportText, docReport, pdfReport } from './report.js';
+import { reportData, reportText, docReport, pdfReport, loadJsPdf } from './report.js';
+import * as sleepv from './sleepview.js';
 import { foodInfo } from './track.js';
 import * as native from './native.js';
 import * as phone from './phone.js';
@@ -15,6 +16,7 @@ import * as notify from './notify.js';
 import { $, todayKey, addDays, weekStartOf, toast, download, fmt, dow, DAY_NAMES } from './util.js';
 
 const top = () => window.scrollTo(0, 0);
+const shiftMonthKey = (ym, n) => { const d = new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + n, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
 
 // After each tick on today's list, refresh the notification in the phone's panel.
 function pushProgress() {
@@ -449,6 +451,15 @@ const ACTIONS = {
   'diet-toggle': (el) => { S.settings.dietOpen = !el.parentElement.open; save(); },
   'notify-on': notifyOn,
   'notify-later': () => { S.settings.notifyAsked = true; save(); render(); toast('You can turn them on later in the Plan tab.'); },
+  'sv-mode': (el) => { sleepv.sv.mode = el.dataset.v; render(); },
+  'sv-shift': (el) => {
+    const n = +el.dataset.n, v = sleepv.sv;
+    if (v.mode === 'week') v.ws = addDays(v.ws, 7 * n); else v.ym = shiftMonthKey(v.ym, n);
+    render();
+  },
+  'sv-pdf': () => sleepv.pdfReport(loadJsPdf),
+  'sv-doc': () => { sleepv.docReport(); toast('Word report saved.'); },
+  'sv-copy': () => sleepv.copyReport(),
   'pick-goal': (el) => {
     const n = +el.dataset.v, d = dayWrite(ui.selDate);
     d.goal = n;
